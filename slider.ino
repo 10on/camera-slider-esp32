@@ -233,6 +233,7 @@ int32_t editMax = 0;
 int32_t editStep = 1;
 void (*editCallback)(int32_t) = NULL;
 MenuScreen editReturnScreen = SCREEN_MAIN;
+const char* const* editValueNames = NULL;  // optional text labels for values
 
 // ── Timing ──
 unsigned long lastBleNotify   = 0;

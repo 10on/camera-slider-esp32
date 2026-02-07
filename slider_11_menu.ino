@@ -1,8 +1,9 @@
 // slider_11_menu.ino — Menu navigation, encoder handling, value editors
 
-// Helper: open value editor
+// Helper: open value editor (with optional text labels for values)
 void openValueEditor(const char* label, int32_t value, int32_t mn, int32_t mx,
-                     int32_t step, void (*cb)(int32_t), MenuScreen returnTo) {
+                     int32_t step, void (*cb)(int32_t), MenuScreen returnTo,
+                     const char* const* names = NULL) {
   editLabel = label;
   editValue = value;
   editMin = mn;
@@ -10,6 +11,7 @@ void openValueEditor(const char* label, int32_t value, int32_t mn, int32_t mx,
   editStep = step;
   editCallback = cb;
   editReturnScreen = returnTo;
+  editValueNames = names;
   currentScreen = SCREEN_VALUE_EDIT;
   displayDirty = true;
 }
@@ -37,6 +39,11 @@ void onWakeOnMotionChanged(int32_t v) {
   cfg.wakeOnMotion = v;
   configSave();
 }
+
+// ── Named value labels ──
+static const char* endstopModeNames[] = { "Stop", "Bounce", "Park" };
+static const char* adxlSensNames[]    = { "Off", "Low", "Mid", "High" };
+static const char* onOffNames[]       = { "Off", "On" };
 
 // ── Menu input router ──
 void menuHandleEncoder() {
@@ -223,7 +230,7 @@ void handleMotionNav(int8_t delta, bool pressed, bool longPress) {
         openValueEditor("Microsteps", cfg.microsteps, 1, 256, 0, onMicrostepsChanged, SCREEN_MOTION_SETTINGS);
         break;
       case 3:
-        openValueEditor("Endstop Md", cfg.endstopMode, 0, 2, 1, onEndstopModeChanged, SCREEN_MOTION_SETTINGS);
+        openValueEditor("Endstop Md", cfg.endstopMode, 0, 2, 1, onEndstopModeChanged, SCREEN_MOTION_SETTINGS, endstopModeNames);
         break;
       case 4:
         currentScreen = SCREEN_SETTINGS; menuIndex = 0; menuOffset = 0; break;
@@ -246,10 +253,10 @@ void handleSleepNav(int8_t delta, bool pressed, bool longPress) {
         openValueEditor("Sleep min", cfg.sleepTimeout, 0, 60, 1, onSleepTOChanged, SCREEN_SLEEP_SETTINGS);
         break;
       case 1:
-        openValueEditor("ADXL Sens", cfg.adxlSensitivity, 0, 3, 1, onAdxlSensChanged, SCREEN_SLEEP_SETTINGS);
+        openValueEditor("ADXL Sens", cfg.adxlSensitivity, 0, 3, 1, onAdxlSensChanged, SCREEN_SLEEP_SETTINGS, adxlSensNames);
         break;
       case 2:
-        openValueEditor("Wake Motn", cfg.wakeOnMotion ? 1 : 0, 0, 1, 1, onWakeOnMotionChanged, SCREEN_SLEEP_SETTINGS);
+        openValueEditor("Wake Motn", cfg.wakeOnMotion ? 1 : 0, 0, 1, 1, onWakeOnMotionChanged, SCREEN_SLEEP_SETTINGS, onOffNames);
         break;
       case 3:
         currentScreen = SCREEN_SETTINGS; menuIndex = 1; menuOffset = 0; break;

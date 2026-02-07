@@ -292,20 +292,22 @@ void drawValueEditor() {
   oled->print(editLabel);
   oled->drawLine(0, 9, 127, 9, SSD1306_WHITE);
 
-  oled->setTextSize(3);
-  // Center the value
-  String valStr = String(editValue);
-  int16_t w = valStr.length() * 18;  // approx width at size 3
-  oled->setCursor((128 - w) / 2, 22);
-  oled->print(editValue);
+  // Show named label or numeric value
+  if (editValueNames && editValue >= editMin && editValue <= editMax) {
+    oled->setTextSize(2);
+    const char* name = editValueNames[editValue - editMin];
+    int16_t w = strlen(name) * 12;
+    oled->setCursor((128 - w) / 2, 26);
+    oled->print(name);
+  } else {
+    oled->setTextSize(3);
+    String valStr = String(editValue);
+    int16_t w = valStr.length() * 18;
+    oled->setCursor((128 - w) / 2, 22);
+    oled->print(editValue);
+  }
 
   oled->setTextSize(1);
-  oled->setCursor(0, 52);
-  oled->print("Min:");
-  oled->print(editMin);
-  oled->print(" Max:");
-  oled->print(editMax);
-
   oled->setCursor(0, 57);
   oled->print("Rotate=Adj Press=Save");
 }
