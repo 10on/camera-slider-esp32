@@ -16,9 +16,9 @@ void endstopsPoll() {
   bool prevE2 = endstop2;
 
   if (pcfFound) {
-    // PCF8574 endstops: active LOW (pulled LOW when triggered)
-    endstop1 = !(pcfInputState & (1 << PCF_ENDSTOP_1));
-    endstop2 = !(pcfInputState & (1 << PCF_ENDSTOP_2));
+    // PCF8574 endstops: active HIGH
+    endstop1 = (pcfInputState & (1 << PCF_ENDSTOP_1)) != 0;
+    endstop2 = (pcfInputState & (1 << PCF_ENDSTOP_2)) != 0;
   } else {
     // Fallback: direct GPIO (active HIGH from main_old.ino)
     endstop1 = digitalRead(ENDSTOP_1_GPIO) == HIGH;
