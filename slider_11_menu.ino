@@ -124,20 +124,29 @@ void handleManualMove(int8_t delta, bool pressed, bool longPress) {
   if (pressed) {
     if (sliderState == STATE_MANUAL_MOVING) {
       motorStop();
-      // State will transition to IDLE in stateUpdate when motor stops
     } else if (sliderState == STATE_IDLE) {
-      sliderState = STATE_MANUAL_MOVING;
-      digitalWrite(EN_PIN, LOW);
-      motorStartRamp(!motorDirection, cfg.speed);  // keep current direction
+      // Block if moving toward triggered endstop
+      bool forward = !motorDirection;  // motorDirection: false=fwd, true=bwd
+      bool blocked = (forward && endstop2) || (!forward && endstop1);
+      if (!blocked) {
+        sliderState = STATE_MANUAL_MOVING;
+        digitalWrite(EN_PIN, LOW);
+        motorStartRamp(forward, cfg.speed);
+      }
     }
   }
 
   // Long press = change direction
   if (longPress) {
     if (sliderState == STATE_MANUAL_MOVING) {
-      motorStopNow();
-      motorDirection = !motorDirection;
-      motorStartRamp(!motorDirection, cfg.speed);
+      // Reverse — block if new direction hits a triggered endstop
+      bool newForward = motorDirection;  // invert: current bwd→fwd, fwd→bwd
+      bool blocked = (newForward && endstop2) || (!newForward && endstop1);
+      if (!blocked) {
+        motorStopNow();
+        motorDirection = !motorDirection;
+        motorStartRamp(newForward, cfg.speed);
+      }
     } else {
       motorDirection = !motorDirection;
     }

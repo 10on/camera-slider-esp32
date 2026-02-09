@@ -96,10 +96,10 @@ void processBleCommands() {
     return;
   }
 
-  // Forward command
+  // Forward command — block if endstop2 (forward end) is triggered
   if (cmdForward) {
     cmdForward = false;
-    if (sliderState == STATE_IDLE) {
+    if (sliderState == STATE_IDLE && !endstop2) {
       sliderState = STATE_MANUAL_MOVING;
       digitalWrite(EN_PIN, LOW);
       motorStartRamp(true, cfg.speed);
@@ -109,10 +109,10 @@ void processBleCommands() {
     return;
   }
 
-  // Backward command
+  // Backward command — block if endstop1 (backward end) is triggered
   if (cmdBackward) {
     cmdBackward = false;
-    if (sliderState == STATE_IDLE) {
+    if (sliderState == STATE_IDLE && !endstop1) {
       sliderState = STATE_MANUAL_MOVING;
       digitalWrite(EN_PIN, LOW);
       motorStartRamp(false, cfg.speed);
@@ -122,16 +122,20 @@ void processBleCommands() {
     return;
   }
 
-  // Go to position command
+  // Go to position command — block if moving toward a triggered endstop
   if (cmdGoToPos) {
     cmdGoToPos = false;
     if (sliderState == STATE_IDLE && isCalibrated) {
       int32_t target = constrain(cmdTargetPos, 0, travelDistance);
-      sliderState = STATE_MOVING_TO_POS;
-      digitalWrite(EN_PIN, LOW);
-      motorMoveTo(target, cfg.speed);
-      displayDirty = true;
-      Serial.print("CMD: GoTo "); Serial.println(target);
+      bool wouldGoForward = target > currentPosition;
+      bool blocked = (wouldGoForward && endstop2) || (!wouldGoForward && endstop1);
+      if (!blocked) {
+        sliderState = STATE_MOVING_TO_POS;
+        digitalWrite(EN_PIN, LOW);
+        motorMoveTo(target, cfg.speed);
+        displayDirty = true;
+        Serial.print("CMD: GoTo "); Serial.println(target);
+      }
     }
     return;
   }
