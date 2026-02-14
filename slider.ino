@@ -177,7 +177,7 @@ bool    isCalibrated   = false;
 
 // ── Config (persisted in NVS) ──
 struct Config {
-  uint16_t speed;         // µs/step (100..5000)
+  uint16_t speed;         // 1-100% (bigger = faster)
   uint16_t homingSpeed;   // µs/step for homing
   uint16_t motorCurrent;  // mA (200..1500)
   uint8_t  microsteps;    // 1,2,4,8,16,32,64,128,256

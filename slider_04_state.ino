@@ -48,11 +48,11 @@ void stateUpdate() {
 }
 
 void processBleCommands() {
-  // Speed change (always accepted)
+  // Speed change (always accepted, BLE sends 1-100)
   if (cmdSpeedChanged) {
     cmdSpeedChanged = false;
-    cfg.speed = constrain(cmdNewSpeed, 100, 5000);
-    targetInterval = cfg.speed;
+    cfg.speed = constrain(cmdNewSpeed, 1, 100);
+    targetInterval = speedToInterval(cfg.speed);
     if (motorRunning) {
       rampStepsLeft = 50;  // smooth speed change
     }
@@ -102,7 +102,7 @@ void processBleCommands() {
     if (sliderState == STATE_IDLE && !endstop2) {
       sliderState = STATE_MANUAL_MOVING;
       digitalWrite(EN_PIN, LOW);
-      motorStartRamp(true, cfg.speed);
+      motorStartRamp(true, speedToInterval(cfg.speed));
       displayDirty = true;
       Serial.println("CMD: Forward");
     }
@@ -115,7 +115,7 @@ void processBleCommands() {
     if (sliderState == STATE_IDLE && !endstop1) {
       sliderState = STATE_MANUAL_MOVING;
       digitalWrite(EN_PIN, LOW);
-      motorStartRamp(false, cfg.speed);
+      motorStartRamp(false, speedToInterval(cfg.speed));
       displayDirty = true;
       Serial.println("CMD: Backward");
     }
@@ -132,7 +132,7 @@ void processBleCommands() {
       if (!blocked) {
         sliderState = STATE_MOVING_TO_POS;
         digitalWrite(EN_PIN, LOW);
-        motorMoveTo(target, cfg.speed);
+        motorMoveTo(target, speedToInterval(cfg.speed));
         displayDirty = true;
         Serial.print("CMD: GoTo "); Serial.println(target);
       }
@@ -166,7 +166,7 @@ void handleEndstopHit() {
         // Reverse direction and restart
         {
           bool newForward = motorDirection;  // motorDirection is inverted (true=backward)
-          motorStartRamp(newForward, cfg.speed);
+          motorStartRamp(newForward, speedToInterval(cfg.speed));
         }
         displayDirty = true;
         Serial.println("Endstop: BOUNCE");

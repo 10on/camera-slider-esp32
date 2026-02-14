@@ -55,9 +55,9 @@ void drawMainScreen() {
   // Line 5: Speed
   oled->setTextSize(1);
   oled->setCursor(0, 44);
-  oled->print("Spd:");
+  oled->print("Speed: ");
   oled->print(cfg.speed);
-  oled->print("us");
+  oled->print("%");
 
   // Direction indicator
   oled->setCursor(80, 44);
@@ -137,7 +137,7 @@ void drawManualMoveScreen() {
   oled->setCursor(0, 26);
   oled->print("Speed: ");
   oled->print(cfg.speed);
-  oled->print(" us");
+  oled->print("%");
 
   oled->setTextSize(2);
   oled->setCursor(0, 40);

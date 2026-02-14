@@ -17,7 +17,7 @@ void openValueEditor(const char* label, int32_t value, int32_t mn, int32_t mx,
 }
 
 // ── Callbacks for value editors ──
-void onSpeedChanged(int32_t v)    { cfg.speed = v; targetInterval = v; configSave(); }
+void onSpeedChanged(int32_t v)    { cfg.speed = v; targetInterval = speedToInterval(v); configSave(); }
 void onRampChanged(int32_t v)     { cfg.rampSteps = v; configSave(); }
 void onCurrentChanged(int32_t v)  { cfg.motorCurrent = v; driver.rms_current(v); configSave(); }
 void onSleepTOChanged(int32_t v)  { cfg.sleepTimeout = v; configSave(); }
@@ -75,11 +75,10 @@ void menuHandleEncoder() {
 
 // ── Main screen ──
 void handleMainScreen(int8_t delta, bool pressed, bool longPress) {
-  // Rotation adjusts speed
+  // Rotation adjusts speed (CW = faster)
   if (delta != 0) {
-    int32_t newSpeed = (int32_t)cfg.speed - delta * 50;
-    cfg.speed = constrain(newSpeed, 100, 5000);
-    targetInterval = cfg.speed;
+    cfg.speed = constrain((int32_t)cfg.speed + delta, 1, 100);
+    targetInterval = speedToInterval(cfg.speed);
     if (motorRunning) rampStepsLeft = 50;
   }
   // Press opens menu
@@ -110,12 +109,11 @@ void handleMenuNav(int8_t delta, bool pressed, bool longPress) {
 
 // ── Manual move ──
 void handleManualMove(int8_t delta, bool pressed, bool longPress) {
-  // Rotate = adjust speed
+  // Rotate = adjust speed (CW = faster)
   if (delta != 0) {
-    int32_t newSpeed = (int32_t)cfg.speed - delta * 50;
-    cfg.speed = constrain(newSpeed, 100, 5000);
+    cfg.speed = constrain((int32_t)cfg.speed + delta, 1, 100);
     if (motorRunning) {
-      targetInterval = cfg.speed;
+      targetInterval = speedToInterval(cfg.speed);
       rampStepsLeft = 50;
     }
   }
@@ -131,7 +129,7 @@ void handleManualMove(int8_t delta, bool pressed, bool longPress) {
       if (!blocked) {
         sliderState = STATE_MANUAL_MOVING;
         digitalWrite(EN_PIN, LOW);
-        motorStartRamp(forward, cfg.speed);
+        motorStartRamp(forward, speedToInterval(cfg.speed));
       }
     }
   }
@@ -145,7 +143,7 @@ void handleManualMove(int8_t delta, bool pressed, bool longPress) {
       if (!blocked) {
         motorStopNow();
         motorDirection = !motorDirection;
-        motorStartRamp(newForward, cfg.speed);
+        motorStartRamp(newForward, speedToInterval(cfg.speed));
       }
     } else {
       motorDirection = !motorDirection;
@@ -230,7 +228,7 @@ void handleMotionNav(int8_t delta, bool pressed, bool longPress) {
   if (pressed) {
     switch (menuIndex) {
       case 0:
-        openValueEditor("Speed", cfg.speed, 100, 5000, 50, onSpeedChanged, SCREEN_MOTION_SETTINGS);
+        openValueEditor("Speed %", cfg.speed, 1, 100, 5, onSpeedChanged, SCREEN_MOTION_SETTINGS);
         break;
       case 1:
         openValueEditor("Ramp Steps", cfg.rampSteps, 10, 1000, 10, onRampChanged, SCREEN_MOTION_SETTINGS);

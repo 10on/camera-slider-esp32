@@ -1,8 +1,14 @@
 // slider_01_config.ino — Config struct, NVS load/save
 
+// Speed level (1-100) → µs/step for timer
+// Level 1 = 5000µs (slowest), Level 100 = 100µs (fastest)
+uint32_t speedToInterval(int32_t level) {
+  return map(constrain(level, 1, 100), 1, 100, 5000, 100);
+}
+
 void configDefaults() {
-  cfg.speed           = 800;
-  cfg.homingSpeed     = 400;
+  cfg.speed           = 50;   // 1-100%, 50 = ~2550µs/step
+  cfg.homingSpeed     = 400;  // µs/step (internal, not user-facing)
   cfg.motorCurrent    = 800;
   cfg.microsteps      = 32;
   cfg.endstopMode     = ENDSTOP_STOP;
@@ -46,8 +52,8 @@ void configLoad() {
   }
 
   // Apply speed
-  stepInterval = cfg.speed;
-  targetInterval = cfg.speed;
+  stepInterval = speedToInterval(cfg.speed);
+  targetInterval = speedToInterval(cfg.speed);
 
   Serial.println("Config loaded");
 }
