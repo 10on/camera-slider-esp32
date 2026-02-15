@@ -16,6 +16,7 @@ void configDefaults() {
   cfg.sleepTimeout    = 5;     // minutes
   cfg.adxlSensitivity = 2;    // mid
   cfg.wakeOnMotion    = true;
+  cfg.wifiEnabled     = false;
   cfg.savedTravel     = 0;
   cfg.savedCenter     = 0;
   cfg.savedCalibrated = false;
@@ -35,6 +36,7 @@ void configLoad() {
   cfg.sleepTimeout    = preferences.getUShort("sleepTo", cfg.sleepTimeout);
   cfg.adxlSensitivity = preferences.getUChar("adxlSens", cfg.adxlSensitivity);
   cfg.wakeOnMotion    = preferences.getBool("wakeMotn", cfg.wakeOnMotion);
+  cfg.wifiEnabled     = preferences.getBool("wifiEn", cfg.wifiEnabled);
   cfg.savedTravel     = preferences.getLong("travel", 0);
   cfg.savedCenter     = preferences.getLong("center", 0);
   cfg.savedCalibrated = preferences.getBool("calib", false);
@@ -70,6 +72,7 @@ void configSave() {
   preferences.putUShort("sleepTo", cfg.sleepTimeout);
   preferences.putUChar("adxlSens", cfg.adxlSensitivity);
   preferences.putBool("wakeMotn", cfg.wakeOnMotion);
+  preferences.putBool("wifiEn", cfg.wifiEnabled);
 
   preferences.end();
   Serial.println("Config saved");

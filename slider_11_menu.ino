@@ -44,6 +44,13 @@ void onWakeOnMotionChanged(int32_t v) {
 static const char* endstopModeNames[] = { "Stop", "Bounce", "Park" };
 static const char* adxlSensNames[]    = { "Off", "Low", "Mid", "High" };
 static const char* onOffNames[]       = { "Off", "On" };
+void onWifiEnabledChanged(int32_t v) {
+  bool en = (v != 0);
+  if (cfg.wifiEnabled == en) return;
+  cfg.wifiEnabled = en;
+  configSave();
+  if (en) wifiStartIfEnabled(); else wifiStop();
+}
 
 // ── Menu input router ──
 void menuHandleEncoder() {
@@ -292,6 +299,11 @@ void handleSystemNav(int8_t delta, bool pressed, bool longPress) {
         stateResetError();
         break;
       case 3:
+        openValueEditor("WiFi", cfg.wifiEnabled ? 1 : 0, 0, 1, 1, onWifiEnabledChanged, SCREEN_SYSTEM_SETTINGS, onOffNames);
+        break;
+      case 4:
+        currentScreen = SCREEN_WIFI_OTA; break;
+      case 5:
         currentScreen = SCREEN_SETTINGS; menuIndex = 2; menuOffset = 0; break;
     }
   }

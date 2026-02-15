@@ -15,6 +15,7 @@ void displayUpdate() {
     case SCREEN_MOTION_SETTINGS: drawMotionSettings(); break;
     case SCREEN_SLEEP_SETTINGS:  drawSleepSettings(); break;
     case SCREEN_SYSTEM_SETTINGS: drawSystemSettings(); break;
+    case SCREEN_WIFI_OTA:    drawWifiOtaScreen(); break;
     case SCREEN_VALUE_EDIT:  drawValueEditor(); break;
   }
 
@@ -282,12 +283,37 @@ static const char* systemItems[] = {
   "Motor Current",
   "Reset Calibration",
   "Reset Error",
+  "WiFi",
+  "WiFi OTA",
   "Back"
 };
-#define SYSTEM_COUNT 4
+#define SYSTEM_COUNT 6
 
 void drawSystemSettings() {
   drawListMenu("SYSTEM", systemItems, SYSTEM_COUNT);
+}
+
+// ── WiFi OTA info screen ──
+void drawWifiOtaScreen() {
+  oled->setFont(u8g2_font_6x10_tf);
+  oled->setCursor(0, 8);
+  oled->print("WIFI OTA");
+  oled->drawLine(0, 10, 127, 10);
+
+  oled->setCursor(0, 22);
+  oled->print("SSID: ");
+  // SSID not stored here; instruct user to see web root
+  oled->print("see Web");
+
+  oled->setCursor(0, 34);
+  oled->print("IP: ");
+  oled->print(wifiGetIpStr());
+
+  oled->setCursor(0, 48);
+  oled->print("Open /update");
+
+  oled->setCursor(0, 58);
+  oled->print("Long=Back");
 }
 
 // ── Value editor ──

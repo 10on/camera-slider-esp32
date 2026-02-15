@@ -113,6 +113,7 @@ enum MenuScreen {
   SCREEN_MOTION_SETTINGS,
   SCREEN_SLEEP_SETTINGS,
   SCREEN_SYSTEM_SETTINGS,
+  SCREEN_WIFI_OTA,
   SCREEN_VALUE_EDIT
 };
 
@@ -188,6 +189,7 @@ struct Config {
   uint16_t sleepTimeout;  // minutes, 0=disabled
   uint8_t  adxlSensitivity; // 0=off, 1=low, 2=mid, 3=high
   bool     wakeOnMotion;
+  bool     wifiEnabled;   // WiFi AP + Web API/OTA enabled
   int32_t  savedTravel;
   int32_t  savedCenter;
   bool     savedCalibrated;
@@ -274,6 +276,12 @@ void menuHandleEncoder();
 void sleepCheck();
 void sleepEnter();
 void sleepWake();
+// WiFi/Web API/OTA
+void wifiInit();
+void wifiStartIfEnabled();
+void wifiStop();
+void wifiLoop();
+const char* wifiGetIpStr();
 
 void setup() {
   Serial.begin(115200);
@@ -284,6 +292,8 @@ void setup() {
   hwInit();
   motorInit();
   bleInit();
+  wifiInit();
+  wifiStartIfEnabled();
 
   lastActivityTime = millis();
   Serial.println("Setup complete");
@@ -337,4 +347,7 @@ void loop() {
 
   // 11. Sleep check
   sleepCheck();
+
+  // 12. WiFi server loop
+  wifiLoop();
 }

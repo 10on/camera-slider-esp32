@@ -93,6 +93,9 @@ void sleepEnter() {
     pcf->write8(pcfOutputState);
   }
 
+  // Stop WiFi to save power
+  wifiStop();
+
   displayDirty = false;
   Serial.println("Sleep mode active");
 }
@@ -112,6 +115,9 @@ void sleepWake() {
 
   currentScreen = SCREEN_MAIN;
   displayDirty = true;
+
+  // Resume WiFi if enabled in config
+  wifiStartIfEnabled();
 
   Serial.println("Awake");
 }
