@@ -8,7 +8,7 @@ void homingStart() {
   sliderState = STATE_HOMING;
   homingPhase = HOME_SEEK_END1;
   homingStepCount = 0;
-  isCalibrated = false;
+  // Keep previous calibration active until homing completes successfully
 
   digitalWrite(EN_PIN, LOW);
 
@@ -47,7 +47,7 @@ void homingUpdate() {
         // Wait until we're past backoff distance AND endstop is released
         if (currentPosition >= homingBackoffTarget) {
           motorStopNow();
-          currentPosition = 0;  // Reset origin
+          currentPosition = 0;  // Reset origin for new homing run
           homingPhase = HOME_SEEK_END2;
           homingStepCount = 0;
           // Move forward toward endstop 2

@@ -17,6 +17,20 @@ static bool wifiRunning = false;
 static String ipStr;
 static bool wifiConnecting = false;
 static unsigned long wifiLastAttempt = 0;
+static int* knownRssi = NULL; // size WIFI_CREDENTIALS_COUNT, -128 if not seen
+static unsigned long lastScan = 0;
+static bool scanPending = false;
+static unsigned long ipPopupUntil = 0;
+static String ipPopupMsg;
+static int wifiState = 0; // 0=idle,1=scanning,2=connecting
+static int wifiMode = 0;  // 0=API, 1=OTA
+
+// View-only scan cache
+static int scanViewState = 0; // 0=idle,1=scanning,2=done
+static int scanCount = 0;
+static char scanSsids[16][33];
+static int scanRssi[16];
+static unsigned long scanViewStartAt = 0;
 
 static void httpHandleRoot();
 static void httpHandleStatus();
@@ -31,70 +45,14 @@ void wifiStartIfEnabled() {
   if (wifiRunning) return;
   if (!cfg.wifiEnabled) return;
 
-  if (WIFI_CREDENTIALS_COUNT == 0) {
-    Serial.println("WiFi: no credentials present");
-    return;
-  }
+  if (WIFI_CREDENTIALS_COUNT == 0) { return; }
 
+  // Start async scanning workflow
   WiFi.mode(WIFI_STA);
   WiFi.disconnect(true);
-
-  // Scan and select best known SSID
-  int n = WiFi.scanNetworks();
-  int bestIdx = -1;
-  int bestRssi = -127;
-  if (n > 0) {
-    for (int i = 0; i < n; i++) {
-      String ssid = WiFi.SSID(i);
-      for (size_t k = 0; k < WIFI_CREDENTIALS_COUNT; k++) {
-        if (ssid == WIFI_CREDENTIALS[k].ssid) {
-          int r = WiFi.RSSI(i);
-          if (r > bestRssi) { bestRssi = r; bestIdx = (int)k; }
-        }
-      }
-    }
-  }
-
-  // Fallback: try sequentially if scan found none
-  int tryOrderCount = bestIdx >= 0 ? 1 : (int)WIFI_CREDENTIALS_COUNT;
-  for (int t = 0; t < tryOrderCount; t++) {
-    int k = (bestIdx >= 0) ? bestIdx : t;
-    
-    WiFi.begin(WIFI_CREDENTIALS[k].ssid, WIFI_CREDENTIALS[k].pass);
-
-    wifiConnecting = true;
-    wifiLastAttempt = millis();
-    unsigned long start = millis();
-    while (millis() - start < 12000) {
-      if (WiFi.status() == WL_CONNECTED) break;
-      delay(100);
-    }
-    wifiConnecting = false;
-
-    if (WiFi.status() == WL_CONNECTED) break;
-  }
-
-  if (WiFi.status() != WL_CONNECTED) {
-    
-    WiFi.mode(WIFI_OFF);
-    return;
-  }
-
-  IPAddress ip = WiFi.localIP();
-  ipStr = ip.toString();
-
-  http = new WebServer(80);
-  http->on("/", HTTP_GET, httpHandleRoot);
-  http->on("/status", HTTP_GET, httpHandleStatus);
-  http->on("/api", HTTP_ANY, httpHandleApi);
-  // Web OTA
-  http->on("/update", HTTP_GET, httpHandleUpdateGet);
-  http->on("/update", HTTP_POST, httpHandleUpdatePost, httpHandleUpdatePost);
-  http->onNotFound(httpHandleNotFound);
-  http->begin();
-
-  wifiRunning = true;
-  
+  WiFi.scanNetworks(true); // async
+  wifiState = 1; // scanning
+  wifiLastAttempt = millis();
 }
 
 void wifiStop() {
@@ -108,17 +66,206 @@ void wifiStop() {
 
 void wifiLoop() {
   if (wifiRunning && http) http->handleClient();
-  // Auto-reconnect if disconnected
-  if (cfg.wifiEnabled && wifiRunning && WiFi.status() != WL_CONNECTED && !wifiConnecting) {
-    if (millis() - wifiLastAttempt > 10000) {
-      wifiStop();
-      wifiStartIfEnabled();
+  // Async scan/connect workflow
+  if (wifiState == 1) {
+    int c = WiFi.scanComplete();
+    if (c >= 0) {
+      // choose first known SSID in env order
+      int chosen = -1;
+      for (size_t k = 0; k < WIFI_CREDENTIALS_COUNT; k++) {
+        for (int i = 0; i < c; i++) {
+          if (WiFi.SSID(i) == WIFI_CREDENTIALS[k].ssid) { chosen = (int)k; break; }
+        }
+        if (chosen >= 0) break;
+      }
+      if (chosen >= 0) {
+        WiFi.begin(WIFI_CREDENTIALS[chosen].ssid, WIFI_CREDENTIALS[chosen].pass);
+        wifiState = 2; // connecting
+        wifiConnecting = true;
+        wifiLastAttempt = millis();
+      } else {
+        // no known SSID found
+        ipPopupMsg = String("WiFi failed");
+        ipPopupUntil = millis() + 2000;
+        displayDirty = true;
+        WiFi.mode(WIFI_OFF);
+        cfg.wifiEnabled = false;
+        // Navigate away from connect screen
+        if (wifiMode == 1) { currentScreen = SCREEN_WIFI_OTA; }
+        else { currentScreen = SCREEN_SETTINGS; }
+        displayDirty = true;
+        wifiState = 0;
+      }
+      WiFi.scanDelete();
+    }
+    // Fail-safe timeout for scanning (connect flow)
+    else if ((long)(millis() - wifiLastAttempt) > 10000) {
+      // cancel scan
+      WiFi.scanDelete();
+      ipPopupMsg = String("WiFi failed");
+      ipPopupUntil = millis() + 2000;
+      displayDirty = true;
+      WiFi.mode(WIFI_OFF);
+      cfg.wifiEnabled = false;
+      if (wifiMode == 1) { currentScreen = SCREEN_WIFI_OTA; }
+      else { currentScreen = SCREEN_SETTINGS; }
+      displayDirty = true;
+      wifiState = 0;
+    }
+  } else if (wifiState == 2) {
+    if (WiFi.status() == WL_CONNECTED) {
+      wifiConnecting = false;
+      // Start server
+      IPAddress ip = WiFi.localIP();
+      ipStr = ip.toString();
+      http = new WebServer(80);
+      http->on("/status", HTTP_GET, httpHandleStatus);
+      http->on("/api", HTTP_ANY, httpHandleApi);
+      if (wifiMode == 1) {
+        // OTA mode: expose update route; root can be minimal text
+        http->on("/", HTTP_GET, httpHandleRoot);
+        http->on("/update", HTTP_GET, httpHandleUpdateGet);
+        http->on("/update", HTTP_POST, httpHandleUpdatePost, httpHandleUpdatePost);
+      } else {
+        http->on("/", HTTP_GET, httpHandleRoot);
+      }
+      http->onNotFound(httpHandleNotFound);
+      http->begin();
+      wifiRunning = true;
+      // popup IP
+      ipPopupMsg = String("IP: ") + ipStr;
+      ipPopupUntil = millis() + 2000;
+      displayDirty = true;
+      // jump to OTA screen if requested
+      if (wifiMode == 1) { currentScreen = SCREEN_WIFI_OTA; displayDirty = true; }
+      wifiState = 0; // done
+    } else if (millis() - wifiLastAttempt > 12000) {
+      wifiConnecting = false;
+      ipPopupMsg = String("WiFi failed");
+      ipPopupUntil = millis() + 2000;
+      displayDirty = true;
+      WiFi.mode(WIFI_OFF);
+      cfg.wifiEnabled = false;
+      // Navigate away from connect screen
+      if (wifiMode == 1) { currentScreen = SCREEN_WIFI_OTA; }
+      else { currentScreen = SCREEN_SETTINGS; }
+      displayDirty = true;
+      wifiState = 0;
+    }
+  }
+  // View-only scan workflow
+  if (scanViewState == 1) {
+    int c = WiFi.scanComplete();
+    if (c >= 0) {
+      scanCount = (c > 16) ? 16 : c;
+      for (int i = 0; i < scanCount; i++) {
+        String s = WiFi.SSID(i);
+        s.toCharArray(scanSsids[i], sizeof(scanSsids[i]));
+        scanRssi[i] = WiFi.RSSI(i);
+      }
+      WiFi.scanDelete();
+      scanViewState = 2;
+      displayDirty = true;
+    }
+    // Timeout guard for view-only scan
+    else if ((long)(millis() - scanViewStartAt) > 8000) {
+      WiFi.scanDelete();
+      scanViewState = 0;
+      ipPopupMsg = String("Scan timeout");
+      ipPopupUntil = millis() + 2000;
+      displayDirty = true;
     }
   }
 }
 
 const char* wifiGetIpStr() {
   return (wifiRunning && ipStr.length()) ? ipStr.c_str() : "-";
+}
+
+bool wifiHasCredentials() {
+  return WIFI_CREDENTIALS_COUNT > 0;
+}
+
+// Known networks metadata for UI
+int wifiKnownCount() { return (int)WIFI_CREDENTIALS_COUNT; }
+const char* wifiKnownSsid(int idx) { return (idx >= 0 && idx < (int)WIFI_CREDENTIALS_COUNT) ? WIFI_CREDENTIALS[idx].ssid : ""; }
+int wifiSelectedIndex() { return (int)cfg.wifiSel; }
+
+void wifiRequestScan() { scanPending = true; }
+
+static void wifiDoScanKnown() {
+  if (WIFI_CREDENTIALS_COUNT == 0) return;
+  if (!knownRssi) {
+    knownRssi = new int[WIFI_CREDENTIALS_COUNT];
+    for (size_t i = 0; i < WIFI_CREDENTIALS_COUNT; i++) knownRssi[i] = -128;
+  }
+  WiFi.mode(WIFI_STA);
+  int n = WiFi.scanNetworks();
+  for (size_t i = 0; i < WIFI_CREDENTIALS_COUNT; i++) knownRssi[i] = -128;
+  for (int i = 0; i < n; i++) {
+    String ssid = WiFi.SSID(i);
+    int rssi = WiFi.RSSI(i);
+    for (size_t k = 0; k < WIFI_CREDENTIALS_COUNT; k++) {
+      if (ssid == WIFI_CREDENTIALS[k].ssid) {
+        knownRssi[k] = rssi;
+      }
+    }
+  }
+  lastScan = millis();
+}
+
+int wifiKnownRssi(int idx) {
+  if (!knownRssi || idx < 0 || idx >= (int)WIFI_CREDENTIALS_COUNT) return -128;
+  return knownRssi[idx];
+}
+
+bool wifiGetIpPopup(char* buf, size_t len) {
+  if (ipPopupUntil == 0) return false;
+  if ((long)(ipPopupUntil - millis()) <= 0) { ipPopupUntil = 0; ipPopupMsg = String(); return false; }
+  if (buf && len) {
+    strlcpy(buf, ipPopupMsg.c_str(), len);
+  }
+  return true;
+}
+
+// Start requests for API/OTA
+void wifiStartApi() {
+  if (!wifiHasCredentials()) { ipPopupMsg = String("No creds"); ipPopupUntil = millis() + 2000; displayDirty = true; return; }
+  cfg.wifiEnabled = true;
+  wifiMode = 0;
+  wifiStartIfEnabled();
+}
+
+void wifiStartOta() {
+  if (!wifiHasCredentials()) { ipPopupMsg = String("No creds"); ipPopupUntil = millis() + 2000; displayDirty = true; return; }
+  cfg.wifiEnabled = true;
+  wifiMode = 1;
+  wifiStartIfEnabled();
+}
+
+int wifiConnectState() { return wifiState; }
+
+// View-only scan API
+void wifiScanStart() {
+  // Start a fresh async scan
+  scanCount = 0;
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect(true);
+  WiFi.scanNetworks(true);
+  scanViewState = 1;
+  scanViewStartAt = millis();
+  displayDirty = true;
+}
+
+int wifiScanState() { return scanViewState; }
+int wifiScanCount() { return scanCount; }
+const char* wifiScanSsid(int idx) {
+  if (idx < 0 || idx >= scanCount) return "";
+  return scanSsids[idx];
+}
+int wifiScanRssi(int idx) {
+  if (idx < 0 || idx >= scanCount) return -128;
+  return scanRssi[idx];
 }
 
 // ── HTTP Handlers ──
@@ -128,6 +275,7 @@ static void httpHandleRoot() {
   txt += "Routes:\n";
   txt += "  GET /status   (JSON)\n";
   txt += "  ANY /api?cmd=forward|backward|stop|home\n";
+  txt += "      /api?cmd=sethome\n";
   txt += "      /api?cmd=goto&pos=N\n";
   txt += "      /api?cmd=speed&val=1..100\n";
   txt += "      /api?cmd=current&val=200..1500\n";
@@ -140,6 +288,8 @@ static void httpHandleStatus() {
   s += "\"state\":\"" + String(stateToString(sliderState)) + "\",";
   s += "\"pos\":" + String((long)currentPosition) + ",";
   s += "\"travel\":" + String((long)travelDistance) + ",";
+  s += "\"center\":" + String((long)centerPosition) + ",";
+  s += "\"home\":" + String((long)cfg.savedHome) + ",";
   s += "\"speed\":" + String((int)cfg.speed) + ",";
   s += "\"current\":" + String((int)cfg.motorCurrent) + ",";
   s += "\"end1\":" + String(endstop1 ? 1 : 0) + ",";
@@ -162,6 +312,13 @@ static void httpHandleApi() {
   if (cmd == "backward") { cmdBackward = true; apiSendOk(); return; }
   if (cmd == "stop") { cmdStop = true; apiSendOk(); return; }
   if (cmd == "home") { cmdHome = true; apiSendOk(); return; }
+  if (cmd == "sethome") {
+    cfg.savedHome = currentPosition;
+    preferences.begin("slider", false);
+    preferences.putLong("homePos", cfg.savedHome);
+    preferences.end();
+    apiSendOk(); return;
+  }
   if (cmd == "goto") {
     if (!http->hasArg("pos")) { apiSendError("no pos"); return; }
     cmdTargetPos = http->arg("pos").toInt();

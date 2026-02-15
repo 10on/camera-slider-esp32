@@ -113,6 +113,9 @@ enum MenuScreen {
   SCREEN_MOTION_SETTINGS,
   SCREEN_SLEEP_SETTINGS,
   SCREEN_SYSTEM_SETTINGS,
+  SCREEN_WIFI_NETWORKS,
+  SCREEN_WIFI_CONNECT,
+  SCREEN_WIFI_SCAN,
   SCREEN_WIFI_OTA,
   SCREEN_VALUE_EDIT
 };
@@ -190,6 +193,8 @@ struct Config {
   uint8_t  adxlSensitivity; // 0=off, 1=low, 2=mid, 3=high
   bool     wakeOnMotion;
   bool     wifiEnabled;   // WiFi AP + Web API/OTA enabled
+  int16_t  wifiSel;       // -1=Auto, otherwise index in WIFI_CREDENTIALS
+  int32_t  savedHome;     // user-defined home position
   int32_t  savedTravel;
   int32_t  savedCenter;
   bool     savedCalibrated;
@@ -226,7 +231,7 @@ float adxlX = 0, adxlY = 0, adxlZ = 0;
 int8_t adxlMotionDir = 0;  // -1 or +1, set by adxlCheckDrift()
 
 // ── Display / Menu ──
-MenuScreen currentScreen = SCREEN_MAIN;
+MenuScreen currentScreen = SCREEN_MANUAL_MOVE;
 int8_t menuIndex = 0;
 int8_t menuOffset = 0;
 bool   displayDirty = true;
@@ -276,12 +281,30 @@ void menuHandleEncoder();
 void sleepCheck();
 void sleepEnter();
 void sleepWake();
-// WiFi/Web API/OTA
+// WiFi/Web API/OTA (disabled for now; keep declarations for future use)
 void wifiInit();
 void wifiStartIfEnabled();
 void wifiStop();
 void wifiLoop();
 const char* wifiGetIpStr();
+bool wifiHasCredentials();
+// WiFi known networks (for UI)
+int wifiKnownCount();
+const char* wifiKnownSsid(int idx);
+int wifiKnownRssi(int idx);
+int wifiSelectedIndex();
+void wifiRequestScan();
+bool wifiGetIpPopup(char* buf, size_t len);
+// Simple connect workflow for API/OTA
+void wifiStartApi();
+void wifiStartOta();
+int wifiConnectState(); // 0=idle,1=scanning,2=connecting
+// View-only scan helpers
+void wifiScanStart();
+int wifiScanState(); // 0=idle,1=scanning,2=done
+int wifiScanCount();
+const char* wifiScanSsid(int idx);
+int wifiScanRssi(int idx);
 
 void setup() {
   Serial.begin(115200);
@@ -291,8 +314,8 @@ void setup() {
   hwInit();
   motorInit();
   bleInit();
-  wifiInit();
-  wifiStartIfEnabled();
+  // wifiInit(); // disabled
+  // Do NOT auto-start WiFi on boot; only start from menu toggle
 
   lastActivityTime = millis();
 }
@@ -347,5 +370,5 @@ void loop() {
   sleepCheck();
 
   // 12. WiFi server loop
-  wifiLoop();
+  // wifiLoop(); // disabled
 }

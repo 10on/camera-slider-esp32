@@ -1,0 +1,148 @@
+<!doctype html>
+<html>
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Camera Slider BLE Tester</title>
+  <style>
+    body{font-family:system-ui,Segoe UI,Arial,sans-serif;margin:16px;line-height:1.3}
+    h1{font-size:18px;margin:0 0 12px}
+    button{margin:4px;padding:8px 12px}
+    input{padding:6px 8px;margin:4px;width:8em}
+    .row{margin:8px 0}
+    #log{white-space:pre;font-family:ui-monospace,Menlo,Consolas,monospace;background:#f7f7f7;border:1px solid #ddd;padding:8px;max-height:220px;overflow:auto}
+    .badge{display:inline-block;padding:2px 6px;border-radius:4px;background:#eee;margin-left:6px}
+    .ok{background:#dff0d8}
+    .err{background:#f2dede}
+    .flex{display:flex;gap:8px;flex-wrap:wrap}
+    .card{border:1px solid #ddd;border-radius:8px;padding:10px}
+  </style>
+  <script>
+    // UUIDs from firmware
+    const SERVICE_UUID   = '4fafc201-1fb5-459e-8fcc-c5c9c331914b';
+    const COMMAND_UUID   = 'beb5483e-36e1-4688-b7f5-ea07361b26a8';
+    const STATUS_UUID    = '1c95d5e3-d8f7-413a-bf3d-7a2e5d7be87e';
+    const SPEED_UUID     = 'd8de624e-140f-4a22-8594-e2216b84a5f2';
+    const POSITION_UUID  = 'a1b2c3d4-e5f6-4789-a012-3456789abcde';
+    const CURRENT_UUID   = 'f1e2d3c4-b5a6-4978-9012-3456789abcde';
+
+    let device, server, service;
+    let chCommand, chStatus, chSpeed, chPos, chCurrent;
+
+    function log(msg){
+      const el = document.getElementById('log');
+      el.textContent += msg + '\n';
+      el.scrollTop = el.scrollHeight;
+    }
+
+    async function connect(){
+      try{
+        const useFilter = document.getElementById('filter').checked;
+        let req;
+        if(useFilter){
+          // Filter to our slider by name and service UUID
+          req = {
+            filters: [
+              { name: 'Camera_Slider', services: [SERVICE_UUID] },
+              { namePrefix: 'Camera', services: [SERVICE_UUID] }
+            ]
+          };
+        } else {
+          // Broad scan (still request access to our service)
+          req = { acceptAllDevices: true, optionalServices: [SERVICE_UUID] };
+        }
+        device = await navigator.bluetooth.requestDevice(req);
+        device.addEventListener('gattserverdisconnected', onDisconnect);
+        server = await device.gatt.connect();
+        service = await server.getPrimaryService(SERVICE_UUID);
+
+        chCommand = await service.getCharacteristic(COMMAND_UUID);
+        chStatus  = await service.getCharacteristic(STATUS_UUID);
+        chSpeed   = await service.getCharacteristic(SPEED_UUID);
+        chPos     = await service.getCharacteristic(POSITION_UUID);
+        chCurrent = await service.getCharacteristic(CURRENT_UUID);
+
+        await chStatus.startNotifications();
+        chStatus.addEventListener('characteristicvaluechanged', onStatus);
+        log('Connected. Listening for status notifications...');
+        document.getElementById('conn').textContent = 'Connected';
+        document.getElementById('conn').className = 'badge ok';
+      }catch(e){
+        log('Connect error: ' + e);
+      }
+    }
+
+    async function disconnect(){
+      try{ if(device && device.gatt.connected) device.gatt.disconnect(); }catch(e){}
+    }
+    function onDisconnect(){
+      log('Disconnected.');
+      document.getElementById('conn').textContent = 'Disconnected';
+      document.getElementById('conn').className = 'badge err';
+    }
+
+    function dvLE16(v){ const dv=new DataView(new ArrayBuffer(2)); dv.setUint16(0, v, true); return dv; }
+    function dvLE32(v){ const dv=new DataView(new ArrayBuffer(4)); dv.setInt32(0, v, true); return dv; }
+
+    async function cmd(c){ if(!chCommand) return; await chCommand.writeValue(new TextEncoder().encode(c)); }
+    async function setSpeed(){ const v=+document.getElementById('speed').value|0; if(!chSpeed) return; await chSpeed.writeValue(dvLE16(v)); }
+    async function setCurrent(){ const v=+document.getElementById('current').value|0; if(!chCurrent) return; await chCurrent.writeValue(dvLE16(v)); }
+    async function goTo(){ const v=+document.getElementById('pos').value|0; if(!chPos) return; await chPos.writeValue(dvLE32(v)); }
+
+    function onStatus(ev){
+      const v = ev.target.value; // DataView
+      if(v.byteLength < 11) return;
+      const pos = v.getInt32(0, true);
+      const flags = v.getUint8(4);
+      const travel = v.getInt32(5, true);
+      const state = v.getUint8(9);
+      const error = v.getUint8(10);
+      const sflags = [];
+      if(flags & 0x01) sflags.push('E1');
+      if(flags & 0x02) sflags.push('E2');
+      if(flags & 0x04) sflags.push('HOMING');
+      if(flags & 0x08) sflags.push('CAL');
+      if(flags & 0x10) sflags.push('GOTO');
+      if(flags & 0x20) sflags.push('RUN');
+      if(flags & 0x40) sflags.push('PARK');
+      document.getElementById('posVal').textContent = pos;
+      document.getElementById('travelVal').textContent = travel;
+      document.getElementById('flagsVal').textContent = sflags.join(' ');
+      document.getElementById('stateVal').textContent = state;
+      document.getElementById('errVal').textContent = error;
+    }
+  </script>
+</head>
+<body>
+  <h1>Camera Slider BLE Tester <span id="conn" class="badge err">Disconnected</span></h1>
+  <div class="row flex">
+    <button onclick="connect()">Connect</button>
+    <label><input id="filter" type="checkbox" checked> Filter to Camera_Slider</label>
+    <button onclick="disconnect()">Disconnect</button>
+  </div>
+
+  <div class="row card">
+    <div class="flex">
+      <button onclick="cmd('F')">Forward</button>
+      <button onclick="cmd('B')">Backward</button>
+      <button onclick="cmd('S')">Stop</button>
+      <button onclick="cmd('H')">Home</button>
+      <button onclick="cmd('R')">Reset Error</button>
+    </div>
+    <div class="flex">
+      <label>Speed % <input id="speed" type="number" min="1" max="100" step="1" value="50"></label>
+      <button onclick="setSpeed()">Set Speed</button>
+      <label>Current mA <input id="current" type="number" min="200" max="1500" step="50" value="500"></label>
+      <button onclick="setCurrent()">Set Current</button>
+      <label>GoTo pos <input id="pos" type="number" step="1" value="0"></label>
+      <button onclick="goTo()">Go</button>
+    </div>
+  </div>
+
+  <div class="row card">
+    <div>Status: pos=<span id="posVal">-</span> travel=<span id="travelVal">-</span> flags=<span id="flagsVal">-</span> state=<span id="stateVal">-</span> err=<span id="errVal">-</span></div>
+  </div>
+
+  <div id="log" class="row"></div>
+</body>
+</html>

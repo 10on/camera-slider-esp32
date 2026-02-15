@@ -46,10 +46,23 @@ static const char* adxlSensNames[]    = { "Off", "Low", "Mid", "High" };
 static const char* onOffNames[]       = { "Off", "On" };
 void onWifiEnabledChanged(int32_t v) {
   bool en = (v != 0);
+  // Guard: if no credentials, force OFF and do nothing
+  if (en && !wifiHasCredentials()) {
+    cfg.wifiEnabled = false;
+    configSave();
+    wifiStop();
+    displayDirty = true;
+    return;
+  }
+
   if (cfg.wifiEnabled == en) return;
   cfg.wifiEnabled = en;
   configSave();
-  if (en) wifiStartIfEnabled(); else wifiStop();
+  if (en) {
+    wifiStartIfEnabled();
+  } else {
+    wifiStop();
+  }
 }
 
 // ── Menu input router ──
@@ -106,7 +119,7 @@ void handleMenuNav(int8_t delta, bool pressed, bool longPress) {
       case 1: currentScreen = SCREEN_GO_TO_POS; cmdTargetPos = currentPosition; break;
       case 2: currentScreen = SCREEN_CALIBRATION; break;
       case 3: currentScreen = SCREEN_SETTINGS; menuIndex = 0; menuOffset = 0; break;
-      case 4: currentScreen = SCREEN_MAIN; break;  // Back
+      case 4: currentScreen = SCREEN_MANUAL_MOVE; break;  // Back to manual move
     }
   }
   if (longPress) {
@@ -228,6 +241,37 @@ void handleSettingsNav(int8_t delta, bool pressed, bool longPress) {
   }
 }
 
+// ── WiFi Scan navigation ──
+void handleWifiScanNav(int8_t delta, bool pressed, bool longPress) {
+  int total = wifiScanState() == 2 ? wifiScanCount() : 0;
+  if (total < 0) total = 0;
+  menuIndex = constrain(menuIndex + delta, 0, max(0, total - 1));
+
+  if (pressed) {
+    wifiScanStart();
+  }
+  if (longPress) {
+    currentScreen = SCREEN_SETTINGS;
+    menuIndex = 2;
+    menuOffset = 0;
+  }
+}
+
+// ── WiFi Connect navigation (allow abort) ──
+void handleWifiConnectNav(int8_t delta, bool pressed, bool longPress) {
+  (void)delta; (void)pressed;
+  if (longPress) {
+    // Abort connecting and stop WiFi
+    wifiStop();
+    cfg.wifiEnabled = false;
+    currentScreen = SCREEN_SETTINGS;
+    menuIndex = 2; // near WiFi items
+    menuOffset = 0;
+  }
+}
+
+// WiFi Networks selection removed from UI per new flow
+
 // ── Motion settings ──
 void handleMotionNav(int8_t delta, bool pressed, bool longPress) {
   menuIndex = constrain(menuIndex + delta, 0, MOTION_COUNT - 1);
@@ -299,11 +343,9 @@ void handleSystemNav(int8_t delta, bool pressed, bool longPress) {
         stateResetError();
         break;
       case 3:
-        openValueEditor("WiFi", cfg.wifiEnabled ? 1 : 0, 0, 1, 1, onWifiEnabledChanged, SCREEN_SYSTEM_SETTINGS, onOffNames);
+        currentScreen = SCREEN_MAIN; // Status screen
         break;
       case 4:
-        currentScreen = SCREEN_WIFI_OTA; break;
-      case 5:
         currentScreen = SCREEN_SETTINGS; menuIndex = 2; menuOffset = 0; break;
     }
   }

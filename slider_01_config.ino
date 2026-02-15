@@ -16,7 +16,10 @@ void configDefaults() {
   cfg.sleepTimeout    = 5;     // minutes
   cfg.adxlSensitivity = 2;    // mid
   cfg.wakeOnMotion    = true;
+  // WiFi default OFF; enable manually in menu
   cfg.wifiEnabled     = false;
+  cfg.wifiSel         = -1;   // Auto
+  cfg.savedHome       = 0;
   cfg.savedTravel     = 0;
   cfg.savedCenter     = 0;
   cfg.savedCalibrated = false;
@@ -37,6 +40,8 @@ void configLoad() {
   cfg.adxlSensitivity = preferences.getUChar("adxlSens", cfg.adxlSensitivity);
   cfg.wakeOnMotion    = preferences.getBool("wakeMotn", cfg.wakeOnMotion);
   cfg.wifiEnabled     = preferences.getBool("wifiEn", cfg.wifiEnabled);
+  cfg.wifiSel         = preferences.getShort("wifiSel", -1);
+  cfg.savedHome       = preferences.getLong("homePos", 0);
   cfg.savedTravel     = preferences.getLong("travel", 0);
   cfg.savedCenter     = preferences.getLong("center", 0);
   cfg.savedCalibrated = preferences.getBool("calib", false);
@@ -71,6 +76,8 @@ void configSave() {
   preferences.putUChar("adxlSens", cfg.adxlSensitivity);
   preferences.putBool("wakeMotn", cfg.wakeOnMotion);
   preferences.putBool("wifiEn", cfg.wifiEnabled);
+  preferences.putShort("wifiSel", cfg.wifiSel);
+  preferences.putLong("homePos", cfg.savedHome);
 
   preferences.end();
   

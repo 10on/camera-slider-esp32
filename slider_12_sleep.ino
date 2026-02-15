@@ -94,7 +94,7 @@ void sleepEnter() {
   }
 
   // Stop WiFi to save power
-  wifiStop();
+  // wifiStop(); // disabled
 
   displayDirty = false;
   
@@ -117,7 +117,7 @@ void sleepWake() {
   displayDirty = true;
 
   // Resume WiFi if enabled in config
-  wifiStartIfEnabled();
+  // wifiStartIfEnabled(); // disabled
 
   
 }
