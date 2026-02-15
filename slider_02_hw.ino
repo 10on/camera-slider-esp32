@@ -43,7 +43,7 @@ void hwInit() {
 
   if (pcfAddr) {
     pcf = new PCF8574(pcfAddr);
-    pcf->begin(SDA_PIN, SCL_PIN);
+    pcf->begin();
     // Set initial output state: all inputs HIGH (pull-up), LED off (P1=0)
     pcfOutputState = 0xFD;  // 0b11111101
     pcf->write8(pcfOutputState);
