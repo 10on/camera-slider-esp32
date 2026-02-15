@@ -1,13 +1,19 @@
 // slider_05_endstops.ino — PCF8574 polling (endstops + encoder), single I2C transaction
 
-static unsigned long lastPcfPoll = 0;
-static unsigned long lastPcfOk   = 0;
+static unsigned long lastPcfPoll   = 0;
+static unsigned long lastPcfOk     = 0;
+static unsigned long lastPcfReinit = 0;
+static bool          pcfOkInit     = false;
 
 void pcfPoll() {
   if (!pcfFound) return;
 
-  // Throttle: poll every 2ms (500 Hz) — plenty for encoder and endstops
   unsigned long now = millis();
+
+  // Initialize lastPcfOk on first call
+  if (!pcfOkInit) { lastPcfOk = now; pcfOkInit = true; }
+
+  // Throttle: poll every 2ms (500 Hz) — plenty for encoder and endstops
   if (now - lastPcfPoll < 2) return;
   lastPcfPoll = now;
 
@@ -29,21 +35,24 @@ void pcfPoll() {
   // Both attempts failed — bus may be stuck
   unsigned long downMs = now - lastPcfOk;
 
-  if (downMs > 200) {
-    // Bus stuck — try re-init
+  // Re-init bus at most once every 3 seconds
+  if (downMs > 500 && now - lastPcfReinit > 3000) {
     Wire.begin(SDA_PIN, SCL_PIN);
     Wire.setClock(400000);
     Wire.setTimeOut(10);
-    Serial.println("I2C bus re-init (PCF lost >200ms)");
+    lastPcfReinit = now;
+    Serial.print("I2C re-init, PCF down ");
+    Serial.print(downMs);
+    Serial.println("ms");
   }
 
-  // Emergency stop if PCF lost >500ms while motor is running
-  if (motorRunning && downMs > 500) {
+  // Emergency stop if PCF lost >1000ms while motor is running
+  if (motorRunning && downMs > 1000) {
     motorStopNow();
     sliderState = STATE_ERROR;
     errorCode = ERR_ENDSTOP_UNEXPECTED;
     displayDirty = true;
-    Serial.println("EMERGENCY: PCF8574 lost >500ms, motor stopped!");
+    Serial.println("EMERGENCY: PCF8574 lost >1s, motor stopped!");
   }
 }
 
