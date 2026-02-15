@@ -2,3 +2,5 @@
 wifi_env.h
 wifi_env_xiaomi.h
 .claude/
+build/
+firmware.bin
