@@ -14,7 +14,7 @@ void homingStart() {
 
   // Phase 1: Seek ENDSTOP_1 (move backward = DIR HIGH)
   motorStart(false, cfg.homingSpeed);  // backward
-  Serial.println("Homing: SEEK_END1");
+  
 }
 
 void homingUpdate() {
@@ -29,7 +29,7 @@ void homingUpdate() {
         homingPhase = HOME_BACKOFF1;
         // Move forward to back off
         motorStart(true, cfg.homingSpeed);  // forward
-        Serial.println("Homing: BACKOFF1");
+        
       }
       // Safety: if we hit endstop 2 while seeking endstop 1
       if (endstop2) {
@@ -37,7 +37,7 @@ void homingUpdate() {
         homingPhase = HOME_IDLE;
         sliderState = STATE_ERROR;
         errorCode = ERR_HOMING_FAIL;
-        Serial.println("Homing FAIL: hit END2 while seeking END1");
+        
       }
       break;
 
@@ -52,7 +52,7 @@ void homingUpdate() {
           homingStepCount = 0;
           // Move forward toward endstop 2
           motorStart(true, cfg.homingSpeed);  // forward
-          Serial.println("Homing: SEEK_END2, position reset to 0");
+        
         }
       }
       break;
@@ -66,8 +66,7 @@ void homingUpdate() {
         homingPhase = HOME_BACKOFF2;
         // Move backward to back off
         motorStart(false, cfg.homingSpeed);  // backward
-        Serial.print("Homing: BACKOFF2, travel=");
-        Serial.println(travelDistance);
+        
       }
       break;
 
@@ -79,8 +78,7 @@ void homingUpdate() {
         homingPhase = HOME_GO_CENTER;
         // Move to center position
         motorMoveTo(centerPosition, cfg.homingSpeed);
-        Serial.print("Homing: GO_CENTER → ");
-        Serial.println(centerPosition);
+        
       }
       break;
 
@@ -92,10 +90,7 @@ void homingUpdate() {
         configSaveCalibration();
         sliderState = STATE_IDLE;
         displayDirty = true;
-        Serial.println("Homing COMPLETE");
-        Serial.print("  Position: "); Serial.println(currentPosition);
-        Serial.print("  Center: "); Serial.println(centerPosition);
-        Serial.print("  Travel: "); Serial.println(travelDistance);
+        
       }
       break;
 

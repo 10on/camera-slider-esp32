@@ -48,16 +48,14 @@ void configLoad() {
     travelDistance = cfg.savedTravel;
     centerPosition = cfg.savedCenter;
     isCalibrated = true;
-    Serial.println("Calibration loaded from NVS");
-    Serial.print("  Travel: "); Serial.println(travelDistance);
-    Serial.print("  Center: "); Serial.println(centerPosition);
+    
   }
 
   // Apply speed
   stepInterval = speedToInterval(cfg.speed);
   targetInterval = speedToInterval(cfg.speed);
 
-  Serial.println("Config loaded");
+  
 }
 
 void configSave() {
@@ -75,7 +73,7 @@ void configSave() {
   preferences.putBool("wifiEn", cfg.wifiEnabled);
 
   preferences.end();
-  Serial.println("Config saved");
+  
 }
 
 void configSaveCalibration() {
@@ -91,7 +89,7 @@ void configSaveCalibration() {
   cfg.savedCenter = centerPosition;
   cfg.savedCalibrated = true;
 
-  Serial.println("Calibration saved");
+  
 }
 
 void configResetCalibration() {
@@ -108,5 +106,5 @@ void configResetCalibration() {
   isCalibrated = false;
   cfg.savedCalibrated = false;
 
-  Serial.println("Calibration reset");
+  
 }

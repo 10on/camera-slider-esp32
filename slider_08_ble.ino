@@ -5,11 +5,11 @@
 class ServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
     bleConnected = true;
-    Serial.println("BLE connected");
+    
   }
   void onDisconnect(BLEServer* pServer) {
     bleConnected = false;
-    Serial.println("BLE disconnected");
+    
     // Restart advertising
     BLEDevice::startAdvertising();
   }
@@ -123,7 +123,7 @@ void bleInit() {
   pAdvertising->setMinPreferred(0x12);
   BLEDevice::startAdvertising();
 
-  Serial.println("BLE ready: Camera_Slider");
+  
 }
 
 // ── Status notification (v2: 11 bytes) ──

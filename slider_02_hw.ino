@@ -21,10 +21,7 @@ void hwInit() {
   driver.microsteps(cfg.microsteps);
   driver.rms_current(cfg.motorCurrent);
   driver.en_spreadCycle(false);  // StealthChop
-  Serial.print("TMC2209 OK, current=");
-  Serial.print(cfg.motorCurrent);
-  Serial.print("mA, usteps=");
-  Serial.println(cfg.microsteps);
+  
 
   // ── I2C bus ──
   Wire.begin(SDA_PIN, SCL_PIN);
@@ -48,10 +45,9 @@ void hwInit() {
     pcfOutputState = 0xFD;  // 0b11111101
     pcf->write8(pcfOutputState);
     pcfFound = true;
-    Serial.print("PCF8574 at 0x");
-    Serial.println(pcfAddr, HEX);
+    
   } else {
-    Serial.println("PCF8574 not found");
+    
   }
 
   // ── OLED autodetect (0x3C) + init via U8g2 (HW I2C) ──
@@ -69,10 +65,10 @@ void hwInit() {
       oled->setCursor(20, 32);
       oled->print("Camera Slider");
       oled->sendBuffer();
-      Serial.println("OLED OK at 0x3C (u8g2 HW I2C)");
+      
     } else {
       if (oled) { delete oled; oled = NULL; }
-      Serial.println("OLED not found");
+      
     }
   }
 
@@ -97,9 +93,7 @@ void vbatReadPrecise() {
 
   float v = (sum / 10.0f / 4095.0f) * 3.3f * VBAT_DIVIDER;
   vbatVoltage = v;
-  Serial.print("Vbat=");
-  Serial.print(vbatVoltage, 1);
-  Serial.println("V");
+  
 }
 
 // Quick ADC read: single sample, no delays
@@ -137,13 +131,12 @@ void adxlInit() {
         adxlWriteReg(REG_POWER_CTL, 0x08);
         delay(50);
 
-        Serial.print("ADXL345 at 0x");
-        Serial.println(addr, HEX);
+        
         return;
       }
     }
   }
-  Serial.println("ADXL345 not found");
+  
 }
 
 void adxlWriteReg(uint8_t reg, uint8_t value) {

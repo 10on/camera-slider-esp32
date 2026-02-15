@@ -286,7 +286,6 @@ const char* wifiGetIpStr();
 void setup() {
   Serial.begin(115200);
   delay(200);
-  Serial.println("=== Camera Slider ===");
 
   configLoad();
   hwInit();
@@ -296,7 +295,6 @@ void setup() {
   wifiStartIfEnabled();
 
   lastActivityTime = millis();
-  Serial.println("Setup complete");
 }
 
 void loop() {

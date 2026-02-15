@@ -14,7 +14,7 @@ void stateUpdate() {
       sliderState = STATE_ERROR;
       errorCode = ERR_BLE_LOST;
       displayDirty = true;
-      Serial.println("ERROR: BLE lost during movement");
+      
       return;
     }
   }
@@ -29,7 +29,7 @@ void stateUpdate() {
   if (sliderState == STATE_MOVING_TO_POS && !motorRunning) {
     sliderState = STATE_IDLE;
     displayDirty = true;
-    Serial.println("Target position reached");
+    
   }
 
   // ── Manual stop check (motor decelerated to stop) ──
@@ -43,7 +43,7 @@ void stateUpdate() {
     digitalWrite(EN_PIN, HIGH);  // disable driver
     sliderState = STATE_IDLE;
     displayDirty = true;
-    Serial.println("Parking complete");
+    
   }
 }
 
@@ -77,7 +77,7 @@ void processBleCommands() {
       }
       sliderState = STATE_IDLE;
       displayDirty = true;
-      Serial.println("CMD: Stop");
+      
     }
     return;
   }
@@ -91,7 +91,7 @@ void processBleCommands() {
       }
       homingStart();
       displayDirty = true;
-      Serial.println("CMD: Home");
+      
     }
     return;
   }
@@ -104,7 +104,7 @@ void processBleCommands() {
       digitalWrite(EN_PIN, LOW);
       motorStartRamp(true, speedToInterval(cfg.speed));
       displayDirty = true;
-      Serial.println("CMD: Forward");
+      
     }
     return;
   }
@@ -117,7 +117,7 @@ void processBleCommands() {
       digitalWrite(EN_PIN, LOW);
       motorStartRamp(false, speedToInterval(cfg.speed));
       displayDirty = true;
-      Serial.println("CMD: Backward");
+      
     }
     return;
   }
@@ -134,7 +134,7 @@ void processBleCommands() {
         digitalWrite(EN_PIN, LOW);
         motorMoveTo(target, speedToInterval(cfg.speed));
         displayDirty = true;
-        Serial.print("CMD: GoTo "); Serial.println(target);
+        
       }
     }
     return;
@@ -158,7 +158,7 @@ void handleEndstopHit() {
         motorStopNow();
         sliderState = STATE_IDLE;
         displayDirty = true;
-        Serial.println("Endstop: STOP");
+        
         break;
 
       case ENDSTOP_BOUNCE:
@@ -170,7 +170,7 @@ void handleEndstopHit() {
           motorStartRamp(newForward, speedToInterval(cfg.speed));
         }
         displayDirty = true;
-        Serial.println("Endstop: BOUNCE");
+        
         break;
 
       case ENDSTOP_PARK:
@@ -181,7 +181,7 @@ void handleEndstopHit() {
         digitalWrite(EN_PIN, HIGH);  // disable driver
         sliderState = STATE_IDLE;
         displayDirty = true;
-        Serial.println("Endstop: PARK");
+        
         break;
     }
   }
@@ -192,7 +192,7 @@ void stateEnterError(ErrorCode code) {
   sliderState = STATE_ERROR;
   errorCode = code;
   displayDirty = true;
-  Serial.print("ERROR: code="); Serial.println(code);
+  
 }
 
 void stateResetError() {
@@ -200,7 +200,7 @@ void stateResetError() {
     sliderState = STATE_IDLE;
     errorCode = ERR_NONE;
     displayDirty = true;
-    Serial.println("Error reset");
+    
   }
 }
 

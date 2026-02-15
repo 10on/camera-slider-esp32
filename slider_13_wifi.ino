@@ -59,7 +59,7 @@ void wifiStartIfEnabled() {
   int tryOrderCount = bestIdx >= 0 ? 1 : (int)WIFI_CREDENTIALS_COUNT;
   for (int t = 0; t < tryOrderCount; t++) {
     int k = (bestIdx >= 0) ? bestIdx : t;
-    Serial.print("WiFi connect: "); Serial.println(WIFI_CREDENTIALS[k].ssid);
+    
     WiFi.begin(WIFI_CREDENTIALS[k].ssid, WIFI_CREDENTIALS[k].pass);
 
     wifiConnecting = true;
@@ -75,7 +75,7 @@ void wifiStartIfEnabled() {
   }
 
   if (WiFi.status() != WL_CONNECTED) {
-    Serial.println("WiFi: failed to connect");
+    
     WiFi.mode(WIFI_OFF);
     return;
   }
@@ -94,7 +94,7 @@ void wifiStartIfEnabled() {
   http->begin();
 
   wifiRunning = true;
-  Serial.print("WiFi STA: "); Serial.println(ipStr);
+  
 }
 
 void wifiStop() {

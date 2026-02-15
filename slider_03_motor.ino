@@ -80,7 +80,6 @@ void motorInit() {
   stepTimer = timerBegin(1000000);  // 1 MHz
   timerAttachInterrupt(stepTimer, &onStepTimer);
   // Don't start alarm yet — motorStart() will do it
-  Serial.println("Motor timer initialized");
 }
 
 // Start motor at constant speed (no ramp)

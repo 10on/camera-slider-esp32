@@ -13,7 +13,7 @@ void sleepCheck() {
 // Try to safely park before sleeping.
 // Blocking sequence: release motor → check ADXL → park if drifting → retry.
 void sleepParkAndEnter() {
-  Serial.println("Sleep: starting safe park sequence");
+  
 
   // Attempt 1: release motor, check for drift
   motorStopNow();
@@ -22,7 +22,7 @@ void sleepParkAndEnter() {
 
   if (adxlCheckDrift(3000)) {
     // Slider is drifting! Re-enable and park toward drift direction
-    Serial.println("Sleep: drift on attempt 1, parking...");
+    
     digitalWrite(EN_PIN, LOW);
 
     bool forward = (adxlMotionDir > 0);
@@ -48,7 +48,7 @@ void sleepParkAndEnter() {
 
     if (adxlCheckDrift(3000)) {
       // Still drifting — try opposite endstop
-      Serial.println("Sleep: drift on attempt 2, parking opposite...");
+      
       digitalWrite(EN_PIN, LOW);
 
       bool forward2 = (adxlMotionDir > 0);
@@ -74,7 +74,7 @@ void sleepParkAndEnter() {
 }
 
 void sleepEnter() {
-  Serial.println("Entering sleep mode");
+  
 
   sliderState = STATE_SLEEP;
   motorStopNow();
@@ -97,13 +97,13 @@ void sleepEnter() {
   wifiStop();
 
   displayDirty = false;
-  Serial.println("Sleep mode active");
+  
 }
 
 void sleepWake() {
   if (sliderState != STATE_SLEEP) return;
 
-  Serial.println("Waking up");
+  
 
   sliderState = STATE_IDLE;
   lastActivityTime = millis();
@@ -119,7 +119,7 @@ void sleepWake() {
   // Resume WiFi if enabled in config
   wifiStartIfEnabled();
 
-  Serial.println("Awake");
+  
 }
 
 // Check for wake triggers (called every loop)

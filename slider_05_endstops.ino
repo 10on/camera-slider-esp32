@@ -88,7 +88,7 @@ void pcfPoll() {
     sliderState = STATE_ERROR;
     errorCode = ERR_ENDSTOP_UNEXPECTED;
     displayDirty = true;
-    Serial.println("EMERGENCY: PCF8574 lost >1s, motor stopped!");
+    
   }
 }
 

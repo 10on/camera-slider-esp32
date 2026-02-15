@@ -39,14 +39,11 @@ bool adxlCheckDrift(uint16_t durationMs) {
     float dx = adxlX - baseX;
     if (fabsf(dx) > threshold) {
       adxlMotionDir = (dx > 0) ? 1 : -1;
-      Serial.print("ADXL drift detected! dx=");
-      Serial.print(dx, 3);
-      Serial.print(" dir=");
-      Serial.println(adxlMotionDir);
+      
       return true;
     }
   }
 
-  Serial.println("ADXL: no drift");
+  
   return false;
 }
