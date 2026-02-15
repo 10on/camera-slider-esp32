@@ -28,7 +28,7 @@ void hwInit() {
 
   // ── I2C bus ──
   Wire.begin(SDA_PIN, SCL_PIN);
-  Wire.setClock(50000);    // 50kHz — снижено для надёжности шины
+  Wire.setClock(100000);   // 100kHz
   Wire.setTimeOut(10);     // 10ms timeout — prevent bus lockup from hanging loop
   delay(50);
 

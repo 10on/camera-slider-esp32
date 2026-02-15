@@ -70,7 +70,7 @@ void pcfPoll() {
   // Re-init bus at most once every 3 seconds
   if (downMs > 500 && now - lastPcfReinit > 3000) {
     Wire.begin(SDA_PIN, SCL_PIN);
-    Wire.setClock(50000);
+    Wire.setClock(100000);
     Wire.setTimeOut(10);
     delay(2);  // дать шине стабилизироваться
     lastPcfReinit = now;
