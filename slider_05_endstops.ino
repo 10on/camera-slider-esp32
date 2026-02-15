@@ -1,9 +1,15 @@
 // slider_05_endstops.ino — PCF8574 polling (endstops + encoder), single I2C transaction
 
+static unsigned long lastPcfPoll = 0;
+
 void pcfPoll() {
   if (!pcfFound) return;
 
-  // Single write + read per loop iteration
+  // Throttle: poll every 2ms (500 Hz) — plenty for encoder and endstops
+  unsigned long now = millis();
+  if (now - lastPcfPoll < 2) return;
+  lastPcfPoll = now;
+
   pcf->write8(pcfOutputState);
   pcfInputState = pcf->read8();
 }
