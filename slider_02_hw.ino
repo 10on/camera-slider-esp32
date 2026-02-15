@@ -28,7 +28,8 @@ void hwInit() {
 
   // ── I2C bus ──
   Wire.begin(SDA_PIN, SCL_PIN);
-  Wire.setClock(400000);  // 400kHz — supported by PCF8574A, SSD1306, ADXL345
+  Wire.setClock(400000);   // 400kHz — supported by PCF8574A, SSD1306, ADXL345
+  Wire.setTimeOut(10);     // 10ms timeout — prevent bus lockup from hanging loop
   delay(50);
 
   // ── PCF8574 autodetect (0x20 or 0x21) ──
