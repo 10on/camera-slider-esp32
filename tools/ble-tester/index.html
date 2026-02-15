@@ -28,6 +28,11 @@
 
     let device, server, service;
     let chCommand, chStatus, chSpeed, chPos, chCurrent;
+    let lastState = -1, lastPos = 0, lastTravel = 0, lastFlags = 0;
+    let pingActive = false;
+    let pingLastTarget = null;
+    let pingLastSentAt = 0;
+    let pingA = 0, pingB = 0, pingDwell = 300;
 
     function log(msg){
       const el = document.getElementById('log');
@@ -88,6 +93,12 @@
     async function setSpeed(){ const v=+document.getElementById('speed').value|0; if(!chSpeed) return; await chSpeed.writeValue(dvLE16(v)); }
     async function setCurrent(){ const v=+document.getElementById('current').value|0; if(!chCurrent) return; await chCurrent.writeValue(dvLE16(v)); }
     async function goTo(){ const v=+document.getElementById('pos').value|0; if(!chPos) return; await chPos.writeValue(dvLE32(v)); }
+    async function goHomeCenter(){
+      if(lastTravel <= 0){ log('Not calibrated: no travel distance'); return; }
+      const center = Math.round(lastTravel/2);
+      await goToTarget(center);
+      log('Go Home (Center): ' + center);
+    }
 
     function onStatus(ev){
       const v = ev.target.value; // DataView
@@ -110,6 +121,56 @@
       document.getElementById('flagsVal').textContent = sflags.join(' ');
       document.getElementById('stateVal').textContent = state;
       document.getElementById('errVal').textContent = error;
+
+      // Save snapshot
+      lastPos = pos; lastTravel = travel; lastFlags = flags; lastState = state;
+
+      // Ping-pong logic: when idle, send next target with dwell
+      if(pingActive){
+        const now = Date.now();
+        if(state === 0 && (now - pingLastSentAt) > pingDwell){
+          let target;
+          if(pingLastTarget == null){
+            // initial pick toward nearer of A/B
+            const distA = Math.abs(pos - pingA);
+            const distB = Math.abs(pos - pingB);
+            target = (distA <= distB) ? pingA : pingB;
+          } else {
+            target = (pingLastTarget === pingA) ? pingB : pingA;
+          }
+          // send goto
+          goToTarget(target);
+          pingLastTarget = target;
+          pingLastSentAt = now;
+        }
+      }
+    }
+
+    async function goToTarget(t){ if(!chPos) return; const dv=dvLE32(t); await chPos.writeValue(dv); }
+
+    function startPing(){
+      if(!device || !server || !service){ log('Not connected'); return; }
+      if(lastTravel <= 0){ log('Not calibrated: run Homing first'); return; }
+      const off = Math.max(0, Math.min(45, (+document.getElementById('pingOffset').value||2))); // percent
+      pingDwell = Math.max(0, (+document.getElementById('pingDwell').value||300));
+      const margin = Math.round(lastTravel * off / 100);
+      pingA = margin;
+      pingB = Math.max(0, lastTravel - margin);
+
+      pingActive = true; pingLastTarget = null; pingLastSentAt = 0;
+      document.getElementById('pingBadge').textContent = 'Running';
+      document.getElementById('pingBadge').className = 'badge ok';
+      log('Ping-Pong started');
+      // Kick once in case we’re already idle
+      setTimeout(()=>{ if(pingActive && lastState===0) onStatus({target:{value:new DataView(new ArrayBuffer(0))}}); }, 100);
+    }
+
+    function stopPing(){
+      pingActive = false; pingLastTarget = null;
+      document.getElementById('pingBadge').textContent = 'Stopped';
+      document.getElementById('pingBadge').className = 'badge';
+      cmd('S');
+      log('Ping-Pong stopped');
     }
   </script>
 </head>
@@ -126,7 +187,7 @@
       <button onclick="cmd('F')">Forward</button>
       <button onclick="cmd('B')">Backward</button>
       <button onclick="cmd('S')">Stop</button>
-      <button onclick="cmd('H')">Home</button>
+      <button onclick="cmd('H')">Homing (Calib)</button>
       <button onclick="cmd('R')">Reset Error</button>
     </div>
     <div class="flex">
@@ -136,6 +197,14 @@
       <button onclick="setCurrent()">Set Current</button>
       <label>GoTo pos <input id="pos" type="number" step="1" value="0"></label>
       <button onclick="goTo()">Go</button>
+      <button onclick="goHomeCenter()">Go Home (Center)</button>
+    </div>
+    <div class="flex">
+      <button onclick="startPing()">Start Ping-Pong</button>
+      <button onclick="stopPing()">Stop Ping-Pong</button>
+      <span id="pingBadge" class="badge">Stopped</span>
+      <label>Offset % <input id="pingOffset" type="number" min="0" max="45" step="1" value="2"></label>
+      <label>Dwell ms <input id="pingDwell" type="number" min="0" max="5000" step="50" value="300"></label>
     </div>
   </div>
 
