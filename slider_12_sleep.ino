@@ -113,6 +113,14 @@ void sleepWake() {
     oled->setPowerSave(0);
   }
 
+  // Engage motor holding after wake: enable driver and set reduced hold current
+  digitalWrite(EN_PIN, LOW);
+  {
+    uint16_t hold = (uint16_t)((cfg.motorCurrent * 30) / 100); // ~30% hold
+    if (hold < 200) hold = 200; // safe floor
+    driver.rms_current(hold);
+  }
+
   currentScreen = SCREEN_MAIN;
   displayDirty = true;
 

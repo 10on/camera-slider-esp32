@@ -11,6 +11,7 @@ void homingStart() {
   // Keep previous calibration active until homing completes successfully
 
   digitalWrite(EN_PIN, LOW);
+  driver.rms_current(cfg.motorCurrent);
 
   // Phase 1: Seek ENDSTOP_1 (move backward = DIR HIGH)
   motorStart(false, cfg.homingSpeed);  // backward

@@ -102,6 +102,7 @@ void processBleCommands() {
     if (sliderState == STATE_IDLE && !endstop2) {
       sliderState = STATE_MANUAL_MOVING;
       digitalWrite(EN_PIN, LOW);
+      driver.rms_current(cfg.motorCurrent);
       motorStartRamp(true, speedToInterval(cfg.speed));
       displayDirty = true;
       
@@ -115,6 +116,7 @@ void processBleCommands() {
     if (sliderState == STATE_IDLE && !endstop1) {
       sliderState = STATE_MANUAL_MOVING;
       digitalWrite(EN_PIN, LOW);
+      driver.rms_current(cfg.motorCurrent);
       motorStartRamp(false, speedToInterval(cfg.speed));
       displayDirty = true;
       
@@ -132,6 +134,7 @@ void processBleCommands() {
       if (!blocked) {
         sliderState = STATE_MOVING_TO_POS;
         digitalWrite(EN_PIN, LOW);
+        driver.rms_current(cfg.motorCurrent);
         motorMoveTo(target, speedToInterval(cfg.speed));
         displayDirty = true;
         
