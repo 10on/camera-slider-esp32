@@ -1,10 +1,9 @@
-// slider_10_display.ino — OLED display rendering
+// slider_10_display.ino — OLED display rendering (u8g2)
 
 void displayUpdate() {
   if (!oledFound) return;
 
-  oled->clearDisplay();
-  oled->setTextColor(SSD1306_WHITE);
+  oled->clearBuffer();
 
   switch (currentScreen) {
     case SCREEN_MAIN:        drawMainScreen(); break;
@@ -19,14 +18,15 @@ void displayUpdate() {
     case SCREEN_VALUE_EDIT:  drawValueEditor(); break;
   }
 
-  oled->display();
+  // Send only changed tiles to the display
+  oled->updateDisplay();
 }
 
 // ── Main screen ──
 void drawMainScreen() {
   // Line 1: State + BLE
-  oled->setTextSize(1);
-  oled->setCursor(0, 0);
+  oled->setFont(u8g2_font_6x10_tf);
+  oled->setCursor(0, 8);
   oled->print(stateToString(sliderState));
 
   // Battery percentage (top right)
@@ -34,21 +34,21 @@ void drawMainScreen() {
     int bp = vbatPercent();
     char buf[6];
     snprintf(buf, sizeof(buf), "%d%%", bp);
-    int16_t w = strlen(buf) * 6;
-    oled->setCursor(128 - w, 0);
+    uint16_t w = oled->getStrWidth(buf);
+    oled->setCursor(128 - w, 8);
     oled->print(buf);
   }
 
   // Line 2: Error (if any)
   if (sliderState == STATE_ERROR) {
-    oled->setCursor(0, 10);
+    oled->setCursor(0, 18);
     oled->print("! ");
     oled->print(errorToString(errorCode));
   }
 
   // Line 3-4: Position (large)
-  oled->setTextSize(2);
-  oled->setCursor(0, 20);
+  oled->setFont(u8g2_font_10x20_tf);
+  oled->setCursor(0, 38);
   if (isCalibrated) {
     // Show percentage
     int pct = travelDistance > 0 ? (int)((int64_t)currentPosition * 100 / travelDistance) : 0;
@@ -59,20 +59,20 @@ void drawMainScreen() {
   }
 
   // Line 5: Speed
-  oled->setTextSize(1);
-  oled->setCursor(0, 44);
+  oled->setFont(u8g2_font_6x10_tf);
+  oled->setCursor(0, 46);
   oled->print("Speed: ");
   oled->print(cfg.speed);
   oled->print("%");
 
   // Direction indicator
-  oled->setCursor(80, 44);
+  oled->setCursor(80, 46);
   if (motorRunning) {
     oled->print(motorDirection ? "<< REV" : ">> FWD");
   }
 
   // Line 6: Endstops
-  oled->setCursor(0, 56);
+  oled->setCursor(0, 58);
   oled->print("E1:");
   oled->print(endstop1 ? "ON " : "off");
   oled->print(" E2:");
@@ -80,17 +80,17 @@ void drawMainScreen() {
 
   // Calibrated indicator
   if (isCalibrated) {
-    oled->setCursor(100, 56);
+    oled->setCursor(100, 58);
     oled->print("CAL");
   }
 }
 
 // ── Generic list menu drawer ──
 void drawListMenu(const char* title, const char* const* items, uint8_t count) {
-  oled->setTextSize(1);
-  oled->setCursor(0, 0);
+  oled->setFont(u8g2_font_6x10_tf);
+  oled->setCursor(0, 8);
   oled->print(title);
-  oled->drawLine(0, 9, 127, 9, SSD1306_WHITE);
+  oled->drawLine(0, 10, 127, 10);
 
   uint8_t maxVisible = 5;
   // Adjust scroll offset
@@ -102,15 +102,15 @@ void drawListMenu(const char* title, const char* const* items, uint8_t count) {
     uint8_t y = 12 + i * 10;
 
     if (idx == menuIndex) {
-      oled->fillRect(0, y, 128, 10, SSD1306_WHITE);
-      oled->setTextColor(SSD1306_BLACK);
+      oled->drawBox(0, y, 128, 10);
+      oled->setDrawColor(0);
     }
 
-    oled->setCursor(2, y + 1);
+    oled->setCursor(2, y + 8);
     oled->print(items[idx]);
 
     if (idx == menuIndex) {
-      oled->setTextColor(SSD1306_WHITE);
+      oled->setDrawColor(1);
     }
   }
 }
@@ -131,74 +131,74 @@ void drawMenuScreen() {
 
 // ── Manual move screen ──
 void drawManualMoveScreen() {
-  oled->setTextSize(1);
-  oled->setCursor(0, 0);
+  oled->setFont(u8g2_font_6x10_tf);
+  oled->setCursor(0, 8);
   oled->print("MANUAL MOVE");
-  oled->drawLine(0, 9, 127, 9, SSD1306_WHITE);
+  oled->drawLine(0, 10, 127, 10);
 
-  oled->setCursor(0, 14);
+  oled->setCursor(0, 18);
   oled->print("Dir: ");
   oled->print(motorDirection ? "Backward" : "Forward");
 
-  oled->setCursor(0, 26);
+  oled->setCursor(0, 30);
   oled->print("Speed: ");
   oled->print(cfg.speed);
   oled->print("%");
 
-  oled->setTextSize(2);
-  oled->setCursor(0, 40);
+  oled->setFont(u8g2_font_10x20_tf);
+  oled->setCursor(0, 48);
   if (sliderState == STATE_MANUAL_MOVING) {
     oled->print("RUNNING");
   } else {
     oled->print("STOPPED");
   }
 
-  oled->setTextSize(1);
-  oled->setCursor(0, 57);
+  oled->setFont(u8g2_font_6x10_tf);
+  oled->setCursor(0, 58);
   oled->print("Press=Start/Stop Long=Dir");
 }
 
 // ── Go to position screen ──
 void drawGoToPosScreen() {
-  oled->setTextSize(1);
-  oled->setCursor(0, 0);
+  oled->setFont(u8g2_font_6x10_tf);
+  oled->setCursor(0, 8);
   oled->print("GO TO POSITION");
-  oled->drawLine(0, 9, 127, 9, SSD1306_WHITE);
+  oled->drawLine(0, 10, 127, 10);
 
   if (!isCalibrated) {
-    oled->setCursor(10, 30);
+    oled->setCursor(10, 34);
     oled->print("Not calibrated!");
-    oled->setCursor(10, 42);
+    oled->setCursor(10, 46);
     oled->print("Run homing first");
     return;
   }
 
-  oled->setCursor(0, 14);
+  oled->setCursor(0, 18);
   oled->print("Current: ");
   oled->print(currentPosition);
 
-  oled->setCursor(0, 26);
+  oled->setCursor(0, 30);
   oled->print("Target: ");
   oled->print(cmdTargetPos);
 
-  oled->setCursor(0, 38);
+  oled->setCursor(0, 42);
   oled->print("Travel: ");
   oled->print(travelDistance);
 
-  oled->setTextSize(1);
-  oled->setCursor(0, 52);
+  oled->setFont(u8g2_font_6x10_tf);
+  oled->setCursor(0, 58);
   oled->print("Rotate=Target Press=Go");
 }
 
 // ── Calibration screen ──
 void drawCalibrationScreen() {
-  oled->setTextSize(1);
-  oled->setCursor(0, 0);
+  oled->setFont(u8g2_font_6x10_tf);
+  oled->setCursor(0, 8);
   oled->print("CALIBRATION");
-  oled->drawLine(0, 9, 127, 9, SSD1306_WHITE);
+  oled->drawLine(0, 10, 127, 10);
 
   if (sliderState == STATE_HOMING) {
-    oled->setCursor(0, 20);
+    oled->setCursor(0, 24);
     switch (homingPhase) {
       case HOME_SEEK_END1: oled->print("Seeking End 1..."); break;
       case HOME_BACKOFF1:  oled->print("Backing off 1..."); break;
@@ -209,7 +209,7 @@ void drawCalibrationScreen() {
     }
 
     // Progress bar
-    oled->drawRect(0, 40, 128, 10, SSD1306_WHITE);
+    oled->drawFrame(0, 42, 128, 10);
     uint8_t progress = 0;
     switch (homingPhase) {
       case HOME_SEEK_END1: progress = 20; break;
@@ -219,23 +219,23 @@ void drawCalibrationScreen() {
       case HOME_GO_CENTER: progress = 100; break;
       default: break;
     }
-    oled->fillRect(2, 42, (124 * progress) / 100, 6, SSD1306_WHITE);
+    oled->drawBox(2, 44, (124 * progress) / 100, 6);
   } else {
-    oled->setCursor(0, 14);
+    oled->setCursor(0, 18);
     oled->print("Status: ");
     oled->print(isCalibrated ? "Calibrated" : "Not calibrated");
 
     if (isCalibrated) {
-      oled->setCursor(0, 26);
+      oled->setCursor(0, 30);
       oled->print("Travel: ");
       oled->print(travelDistance);
 
-      oled->setCursor(0, 38);
+      oled->setCursor(0, 42);
       oled->print("Center: ");
       oled->print(centerPosition);
     }
 
-    oled->setCursor(0, 52);
+    oled->setCursor(0, 58);
     oled->print("Press=Start homing");
   }
 }
@@ -292,28 +292,28 @@ void drawSystemSettings() {
 
 // ── Value editor ──
 void drawValueEditor() {
-  oled->setTextSize(1);
-  oled->setCursor(0, 0);
+  oled->setFont(u8g2_font_6x10_tf);
+  oled->setCursor(0, 8);
   oled->print("EDIT: ");
   oled->print(editLabel);
-  oled->drawLine(0, 9, 127, 9, SSD1306_WHITE);
+  oled->drawLine(0, 10, 127, 10);
 
   // Show named label or numeric value
   if (editValueNames && editValue >= editMin && editValue <= editMax) {
-    oled->setTextSize(2);
+    oled->setFont(u8g2_font_10x20_tf);
     const char* name = editValueNames[editValue - editMin];
-    int16_t w = strlen(name) * 12;
-    oled->setCursor((128 - w) / 2, 26);
+    uint16_t w = oled->getStrWidth(name);
+    oled->setCursor((128 - w) / 2, 40);
     oled->print(name);
   } else {
-    oled->setTextSize(3);
+    oled->setFont(u8g2_font_10x20_tf);
     String valStr = String(editValue);
-    int16_t w = valStr.length() * 18;
-    oled->setCursor((128 - w) / 2, 22);
-    oled->print(editValue);
+    uint16_t w = oled->getStrWidth(valStr.c_str());
+    oled->setCursor((128 - w) / 2, 40);
+    oled->print(valStr);
   }
 
-  oled->setTextSize(1);
-  oled->setCursor(0, 57);
+  oled->setFont(u8g2_font_6x10_tf);
+  oled->setCursor(0, 58);
   oled->print("Rotate=Adj Press=Save");
 }

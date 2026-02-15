@@ -9,7 +9,7 @@ uint32_t speedToInterval(int32_t level) {
 void configDefaults() {
   cfg.speed           = 50;   // 1-100%, 50 = ~2550µs/step
   cfg.homingSpeed     = 400;  // µs/step (internal, not user-facing)
-  cfg.motorCurrent    = 800;
+  cfg.motorCurrent    = 500;
   cfg.microsteps      = 32;
   cfg.endstopMode     = ENDSTOP_STOP;
   cfg.rampSteps       = 200;

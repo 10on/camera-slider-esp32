@@ -28,7 +28,7 @@ void hwInit() {
 
   // ── I2C bus ──
   Wire.begin(SDA_PIN, SCL_PIN);
-  Wire.setClock(400000);   // 400kHz — supported by PCF8574A, SSD1306, ADXL345
+  Wire.setClock(50000);    // 50kHz — снижено для надёжности шины
   Wire.setTimeOut(10);     // 10ms timeout — prevent bus lockup from hanging loop
   delay(50);
 
@@ -54,21 +54,26 @@ void hwInit() {
     Serial.println("PCF8574 not found");
   }
 
-  // ── OLED autodetect ──
-  oled = new Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
-  if (oled->begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
-    oledFound = true;
-    oled->clearDisplay();
-    oled->setTextColor(SSD1306_WHITE);
-    oled->setTextSize(1);
-    oled->setCursor(20, 28);
-    oled->print("Camera Slider");
-    oled->display();
-    Serial.println("OLED OK at 0x3C");
-  } else {
-    delete oled;
-    oled = NULL;
-    Serial.println("OLED not found");
+  // ── OLED autodetect (0x3C) + init via U8g2 (HW I2C) ──
+  {
+    Wire.beginTransmission(0x3C);
+    if (Wire.endTransmission() == 0) {
+      // Аппаратный I2C через Wire
+      oled = new U8G2_SSD1306_128X64_NONAME_F_HW_I2C(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+      oled->begin();
+      oledFound = true;
+
+      // Splash
+      oled->clearBuffer();
+      oled->setFont(u8g2_font_6x10_tf);
+      oled->setCursor(20, 32);
+      oled->print("Camera Slider");
+      oled->sendBuffer();
+      Serial.println("OLED OK at 0x3C (u8g2 HW I2C)");
+    } else {
+      if (oled) { delete oled; oled = NULL; }
+      Serial.println("OLED not found");
+    }
   }
 
   // ── Battery voltage — first precise read ──

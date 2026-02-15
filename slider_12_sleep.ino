@@ -80,11 +80,11 @@ void sleepEnter() {
   motorStopNow();
   digitalWrite(EN_PIN, HIGH);
 
-  // Turn off OLED
+  // Turn off OLED (u8g2)
   if (oledFound) {
-    oled->clearDisplay();
-    oled->display();
-    oled->ssd1306_command(SSD1306_DISPLAYOFF);
+    oled->clearBuffer();
+    oled->sendBuffer();
+    oled->setPowerSave(1);
   }
 
   // Turn off LEDs
@@ -105,9 +105,9 @@ void sleepWake() {
   sliderState = STATE_IDLE;
   lastActivityTime = millis();
 
-  // Re-enable OLED
+  // Re-enable OLED (u8g2)
   if (oledFound) {
-    oled->ssd1306_command(SSD1306_DISPLAYON);
+    oled->setPowerSave(0);
   }
 
   currentScreen = SCREEN_MAIN;

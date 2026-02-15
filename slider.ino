@@ -3,8 +3,7 @@
 
 #include <Wire.h>
 #include <PCF8574.h>
-#include <Adafruit_GFX.h>
-#include <Adafruit_SSD1306.h>
+#include <U8g2lib.h>
 #include <TMCStepper.h>
 #include <BLEDevice.h>
 #include <BLEServer.h>
@@ -121,7 +120,7 @@ enum MenuScreen {
 HardwareSerial TMCSerial(1);
 TMC2209Stepper driver(&TMCSerial, R_SENSE, DRIVER_ADDR);
 PCF8574* pcf = NULL;
-Adafruit_SSD1306* oled = NULL;
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C* oled = NULL;
 Preferences preferences;
 
 // ── Hardware presence flags ──

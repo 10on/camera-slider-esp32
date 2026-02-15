@@ -1,9 +1,39 @@
 // slider_05_endstops.ino — PCF8574 polling (endstops + encoder), single I2C transaction
 
-static unsigned long lastPcfPoll   = 0;
-static unsigned long lastPcfOk     = 0;
-static unsigned long lastPcfReinit = 0;
-static bool          pcfOkInit     = false;
+static unsigned long lastPcfPoll     = 0;
+static unsigned long lastPcfOk       = 0;
+static unsigned long lastPcfReinit   = 0;
+static bool          pcfOkInit       = false;
+
+// ── I2C debug helpers (local) ──
+static bool i2cPing(uint8_t addr) {
+  Wire.beginTransmission(addr);
+  return Wire.endTransmission() == 0;
+}
+
+// Debug helpers removed for release build
+
+static bool pcfTryRelocate() {
+  // Try both typical addresses and (re)bind to the first responsive
+  const uint8_t candidates[] = {0x20, 0x21};
+  for (uint8_t i = 0; i < sizeof(candidates); i++) {
+    uint8_t addr = candidates[i];
+    if (!i2cPing(addr)) continue;
+
+    // Recreate object
+    if (pcf) { delete pcf; pcf = NULL; }
+    pcf = new PCF8574(addr);
+    pcf->begin();
+    // Restore outputs
+    pcf->write8(pcfOutputState);
+
+    pcfAddr = addr;
+    pcfFound = true;
+    lastPcfOk = millis();
+    return true;
+  }
+  return false;
+}
 
 void pcfPoll() {
   if (!pcfFound) return;
@@ -13,15 +43,17 @@ void pcfPoll() {
   // Initialize lastPcfOk on first call
   if (!pcfOkInit) { lastPcfOk = now; pcfOkInit = true; }
 
-  // Throttle: poll every 2ms (500 Hz) — plenty for encoder and endstops
-  if (now - lastPcfPoll < 2) return;
+  // Throttle: poll every 5ms (200 Hz) — достаточно для энкодера/концевиков
+  if (now - lastPcfPoll < 5) return;
   lastPcfPoll = now;
 
-  // Try up to 2 attempts
-  for (uint8_t attempt = 0; attempt < 2; attempt++) {
+  // Try up to 4 attempts
+  for (uint8_t attempt = 0; attempt < 4; attempt++) {
     Wire.beginTransmission(pcfAddr);
     Wire.write(pcfOutputState);
     if (Wire.endTransmission() == 0) {
+      // Небольшая пауза после записи перед чтением — некоторые экземпляры PCF любят settle
+      delayMicroseconds(200);
       Wire.requestFrom(pcfAddr, (uint8_t)1);
       if (Wire.available()) {
         pcfInputState = Wire.read();
@@ -38,12 +70,16 @@ void pcfPoll() {
   // Re-init bus at most once every 3 seconds
   if (downMs > 500 && now - lastPcfReinit > 3000) {
     Wire.begin(SDA_PIN, SCL_PIN);
-    Wire.setClock(400000);
+    Wire.setClock(50000);
     Wire.setTimeOut(10);
+    delay(2);  // дать шине стабилизироваться
     lastPcfReinit = now;
-    Serial.print("I2C re-init, PCF down ");
-    Serial.print(downMs);
-    Serial.println("ms");
+
+    // Try to relocate/rebind PCF if alternative address is alive
+    bool currentAlive = (pcfAddr && i2cPing(pcfAddr));
+    if (!currentAlive) {
+      pcfTryRelocate();
+    }
   }
 
   // Emergency stop if PCF lost >1000ms while motor is running
