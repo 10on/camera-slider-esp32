@@ -1,14 +1,22 @@
-// slider_13_wifi.ino — WiFi AP + Web API + Web OTA (simple)
+// slider_13_wifi.ino — WiFi STA + Web API + Web OTA (no UI)
 
 #include <WiFi.h>
 #include <WebServer.h>
 #include <Update.h>
 
+#if __has_include("wifi_env.h")
+#include "wifi_env.h"  // defines WIFI_CREDENTIALS[] and WIFI_CREDENTIALS_COUNT
+#else
+struct WifiCred { const char* ssid; const char* pass; };
+static const WifiCred WIFI_CREDENTIALS[] = {};
+static const size_t WIFI_CREDENTIALS_COUNT = 0;
+#endif
+
 static WebServer* http = NULL;
 static bool wifiRunning = false;
-static String apSsid;
-static const char* apPass = "slider123"; // 8+ chars
 static String ipStr;
+static bool wifiConnecting = false;
+static unsigned long wifiLastAttempt = 0;
 
 static void httpHandleRoot();
 static void httpHandleStatus();
@@ -17,29 +25,63 @@ static void httpHandleApi();
 static void httpHandleUpdateGet();
 static void httpHandleUpdatePost();
 
-void wifiInit() {
-  // Generate SSID with chip ID
-  uint32_t chip = (uint32_t)ESP.getEfuseMac();
-  char buf[20];
-  snprintf(buf, sizeof(buf), "Slider-%04X", (uint16_t)(chip & 0xFFFF));
-  apSsid = String(buf);
-}
+void wifiInit() {}
 
 void wifiStartIfEnabled() {
   if (wifiRunning) return;
   if (!cfg.wifiEnabled) return;
 
-  WiFi.mode(WIFI_AP);
-  bool ok = WiFi.softAP(apSsid.c_str(), apPass);
-  if (!ok) {
-    Serial.println("WiFi AP start failed");
+  if (WIFI_CREDENTIALS_COUNT == 0) {
+    Serial.println("WiFi: no credentials present");
     return;
   }
 
-  IPAddress ip = WiFi.softAPIP();
-  char ipb[24];
-  snprintf(ipb, sizeof(ipb), "%u.%u.%u.%u", ip[0], ip[1], ip[2], ip[3]);
-  ipStr = String(ipb);
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect(true);
+
+  // Scan and select best known SSID
+  int n = WiFi.scanNetworks();
+  int bestIdx = -1;
+  int bestRssi = -127;
+  if (n > 0) {
+    for (int i = 0; i < n; i++) {
+      String ssid = WiFi.SSID(i);
+      for (size_t k = 0; k < WIFI_CREDENTIALS_COUNT; k++) {
+        if (ssid == WIFI_CREDENTIALS[k].ssid) {
+          int r = WiFi.RSSI(i);
+          if (r > bestRssi) { bestRssi = r; bestIdx = (int)k; }
+        }
+      }
+    }
+  }
+
+  // Fallback: try sequentially if scan found none
+  int tryOrderCount = bestIdx >= 0 ? 1 : (int)WIFI_CREDENTIALS_COUNT;
+  for (int t = 0; t < tryOrderCount; t++) {
+    int k = (bestIdx >= 0) ? bestIdx : t;
+    Serial.print("WiFi connect: "); Serial.println(WIFI_CREDENTIALS[k].ssid);
+    WiFi.begin(WIFI_CREDENTIALS[k].ssid, WIFI_CREDENTIALS[k].pass);
+
+    wifiConnecting = true;
+    wifiLastAttempt = millis();
+    unsigned long start = millis();
+    while (millis() - start < 12000) {
+      if (WiFi.status() == WL_CONNECTED) break;
+      delay(100);
+    }
+    wifiConnecting = false;
+
+    if (WiFi.status() == WL_CONNECTED) break;
+  }
+
+  if (WiFi.status() != WL_CONNECTED) {
+    Serial.println("WiFi: failed to connect");
+    WiFi.mode(WIFI_OFF);
+    return;
+  }
+
+  IPAddress ip = WiFi.localIP();
+  ipStr = ip.toString();
 
   http = new WebServer(80);
   http->on("/", HTTP_GET, httpHandleRoot);
@@ -52,13 +94,13 @@ void wifiStartIfEnabled() {
   http->begin();
 
   wifiRunning = true;
-  Serial.print("WiFi AP: "); Serial.print(apSsid); Serial.print(" "); Serial.println(ipStr);
+  Serial.print("WiFi STA: "); Serial.println(ipStr);
 }
 
 void wifiStop() {
   if (!wifiRunning) return;
   if (http) { http->stop(); delete http; http = NULL; }
-  WiFi.softAPdisconnect(true);
+  WiFi.disconnect(true);
   WiFi.mode(WIFI_OFF);
   wifiRunning = false;
   ipStr = String();
@@ -66,6 +108,13 @@ void wifiStop() {
 
 void wifiLoop() {
   if (wifiRunning && http) http->handleClient();
+  // Auto-reconnect if disconnected
+  if (cfg.wifiEnabled && wifiRunning && WiFi.status() != WL_CONNECTED && !wifiConnecting) {
+    if (millis() - wifiLastAttempt > 10000) {
+      wifiStop();
+      wifiStartIfEnabled();
+    }
+  }
 }
 
 const char* wifiGetIpStr() {
@@ -74,10 +123,9 @@ const char* wifiGetIpStr() {
 
 // ── HTTP Handlers ──
 static void httpHandleRoot() {
-  String txt = "Camera Slider WiFi API\n";
-  txt += "AP SSID: "; txt += apSsid; txt += "  PASS: "; txt += apPass; txt += "\n";
+  String txt = "Camera Slider WiFi API (STA)\n";
   txt += "IP: "; txt += ipStr; txt += "\n\n";
-  txt += "Endpoints:\n";
+  txt += "Routes:\n";
   txt += "  GET /status   (JSON)\n";
   txt += "  ANY /api?cmd=forward|backward|stop|home\n";
   txt += "      /api?cmd=goto&pos=N\n";

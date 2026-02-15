@@ -1,0 +1,12 @@
+// wifi_env.h.example — local WiFi credentials (not committed)
+// Copy to wifi_env.h and fill with your networks. File is .gitignore'd.
+
+struct WifiCred { const char* ssid; const char* pass; };
+
+static const WifiCred WIFI_CREDENTIALS[] = {
+  { "MyHomeWiFi", "password123" },
+  { "OfficeNet",  "supersecret" }
+};
+
+static const size_t WIFI_CREDENTIALS_COUNT = sizeof(WIFI_CREDENTIALS)/sizeof(WIFI_CREDENTIALS[0]);
+
