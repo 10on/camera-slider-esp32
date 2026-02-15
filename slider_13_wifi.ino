@@ -74,24 +74,17 @@ const char* wifiGetIpStr() {
 
 // ── HTTP Handlers ──
 static void httpHandleRoot() {
-  String html = "<!doctype html><html><head><meta charset='utf-8'><title>Slider</title>";
-  html += "<style>body{font-family:system-ui;margin:20px}button{margin:4px;padding:10px 14px}input{width:6em}</style></head><body>";
-  html += "<h2>Camera Slider</h2>";
-  html += "<p>AP SSID: <b>" + apSsid + "</b> Password: <b>" + String(apPass) + "</b></p>";
-  html += "<p><a href='/update'>Firmware Update</a></p>";
-  html += "<div><button onclick=fetch('/api?cmd=forward')>Forward</button>";
-  html += "<button onclick=fetch('/api?cmd=backward')>Backward</button>";
-  html += "<button onclick=fetch('/api?cmd=stop')>Stop</button>";
-  html += "<button onclick=fetch('/api?cmd=home')>Home</button></div>";
-  html += "<div><label>GoTo: <input id=t type=number min=0 step=1></label>";
-  html += "<button onclick=fetch('/api?cmd=goto&pos='+document.getElementById('t').value)>Go</button></div>";
-  html += "<div><label>Speed%: <input id=s type=number min=1 max=100 step=1></label>";
-  html += "<button onclick=fetch('/api?cmd=speed&val='+document.getElementById('s').value)>Set</button></div>";
-  html += "<div><label>Current mA: <input id=c type=number min=200 max=1500 step=50></label>";
-  html += "<button onclick=fetch('/api?cmd=current&val='+document.getElementById('c').value)>Set</button></div>";
-  html += "<pre id=o></pre><script>setInterval(()=>fetch('/status').then(r=>r.json()).then(j=>o.textContent=JSON.stringify(j,null,2)),500);</script>";
-  html += "</body></html>";
-  http->send(200, "text/html", html);
+  String txt = "Camera Slider WiFi API\n";
+  txt += "AP SSID: "; txt += apSsid; txt += "  PASS: "; txt += apPass; txt += "\n";
+  txt += "IP: "; txt += ipStr; txt += "\n\n";
+  txt += "Endpoints:\n";
+  txt += "  GET /status   (JSON)\n";
+  txt += "  ANY /api?cmd=forward|backward|stop|home\n";
+  txt += "      /api?cmd=goto&pos=N\n";
+  txt += "      /api?cmd=speed&val=1..100\n";
+  txt += "      /api?cmd=current&val=200..1500\n";
+  txt += "  GET/POST /update   (OTA upload .bin)\n";
+  http->send(200, "text/plain", txt);
 }
 
 static void httpHandleStatus() {
@@ -182,4 +175,3 @@ static void httpHandleUpdatePost() {
 static void httpHandleNotFound() {
   http->send(404, "text/plain", "Not found");
 }
-
