@@ -1,5 +1,15 @@
 // slider_11_menu.ino — Menu navigation, encoder handling, value editors
 
+// Helper: wrap index by count with delta (supports negative deltas)
+static int8_t wrapIndexDelta(int8_t idx, int8_t delta, int8_t count) {
+  if (count <= 0) return 0;
+  int n = idx + delta;
+  // wrap around
+  while (n < 0) n += count;
+  while (n >= count) n -= count;
+  return (int8_t)n;
+}
+
 // Helper: open value editor (with optional text labels for values)
 void openValueEditor(const char* label, int32_t value, int32_t mn, int32_t mx,
                      int32_t step, void (*cb)(int32_t), MenuScreen returnTo,
@@ -111,7 +121,7 @@ void handleMainScreen(int8_t delta, bool pressed, bool longPress) {
 
 // ── Main menu navigation ──
 void handleMenuNav(int8_t delta, bool pressed, bool longPress) {
-  menuIndex = constrain(menuIndex + delta, 0, MAIN_MENU_COUNT - 1);
+  menuIndex = wrapIndexDelta(menuIndex, delta, MAIN_MENU_COUNT);
 
   if (pressed) {
     switch (menuIndex) {
@@ -224,7 +234,7 @@ void handleCalibration(int8_t delta, bool pressed, bool longPress) {
 
 // ── Settings navigation ──
 void handleSettingsNav(int8_t delta, bool pressed, bool longPress) {
-  menuIndex = constrain(menuIndex + delta, 0, SETTINGS_COUNT - 1);
+  menuIndex = wrapIndexDelta(menuIndex, delta, SETTINGS_COUNT);
 
   if (pressed) {
     switch (menuIndex) {
@@ -245,7 +255,11 @@ void handleSettingsNav(int8_t delta, bool pressed, bool longPress) {
 void handleWifiScanNav(int8_t delta, bool pressed, bool longPress) {
   int total = wifiScanState() == 2 ? wifiScanCount() : 0;
   if (total < 0) total = 0;
-  menuIndex = constrain(menuIndex + delta, 0, max(0, total - 1));
+  if (total > 0) {
+    menuIndex = wrapIndexDelta(menuIndex, delta, total);
+  } else {
+    menuIndex = 0;
+  }
 
   if (pressed) {
     wifiScanStart();
@@ -274,7 +288,7 @@ void handleWifiConnectNav(int8_t delta, bool pressed, bool longPress) {
 
 // ── Motion settings ──
 void handleMotionNav(int8_t delta, bool pressed, bool longPress) {
-  menuIndex = constrain(menuIndex + delta, 0, MOTION_COUNT - 1);
+  menuIndex = wrapIndexDelta(menuIndex, delta, MOTION_COUNT);
 
   if (pressed) {
     switch (menuIndex) {
@@ -303,7 +317,7 @@ void handleMotionNav(int8_t delta, bool pressed, bool longPress) {
 
 // ── Sleep settings ──
 void handleSleepNav(int8_t delta, bool pressed, bool longPress) {
-  menuIndex = constrain(menuIndex + delta, 0, SLEEP_COUNT - 1);
+  menuIndex = wrapIndexDelta(menuIndex, delta, SLEEP_COUNT);
 
   if (pressed) {
     switch (menuIndex) {
@@ -329,7 +343,7 @@ void handleSleepNav(int8_t delta, bool pressed, bool longPress) {
 
 // ── System settings ──
 void handleSystemNav(int8_t delta, bool pressed, bool longPress) {
-  menuIndex = constrain(menuIndex + delta, 0, SYSTEM_COUNT - 1);
+  menuIndex = wrapIndexDelta(menuIndex, delta, SYSTEM_COUNT);
 
   if (pressed) {
     switch (menuIndex) {
