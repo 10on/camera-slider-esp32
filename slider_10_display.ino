@@ -29,9 +29,15 @@ void drawMainScreen() {
   oled->setCursor(0, 0);
   oled->print(stateToString(sliderState));
 
-  // BLE indicator (top right)
-  oled->setCursor(100, 0);
-  oled->print(bleConnected ? "BLE" : "---");
+  // Battery percentage (top right)
+  {
+    int bp = vbatPercent();
+    char buf[6];
+    snprintf(buf, sizeof(buf), "%d%%", bp);
+    int16_t w = strlen(buf) * 6;
+    oled->setCursor(128 - w, 0);
+    oled->print(buf);
+  }
 
   // Line 2: Error (if any)
   if (sliderState == STATE_ERROR) {

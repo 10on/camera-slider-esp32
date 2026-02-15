@@ -8,6 +8,10 @@ void hwInit() {
   digitalWrite(EN_PIN, LOW);   // enable driver
   digitalWrite(DIR_PIN, LOW);
 
+  // ── Battery voltage ADC ──
+  pinMode(VBAT_PIN, INPUT);
+  analogSetAttenuation(ADC_11db);  // 0-3.3V range
+
   // ── TMC2209 via UART ──
   TMCSerial.begin(115200, SERIAL_8N1, UART_RX, UART_TX);
   driver.begin();
@@ -65,8 +69,43 @@ void hwInit() {
     Serial.println("OLED not found");
   }
 
+  // ── Battery voltage — first precise read ──
+  vbatReadPrecise();
+
   // ── ADXL345 autodetect ──
   adxlInit();
+}
+
+// Precise ADC read: silence TMC chopping, 10x averaged
+// Call only when motor is NOT running
+void vbatReadPrecise() {
+  driver.shaft(false);  // quiet TMC internal state
+  delay(50);            // let noise settle
+
+  uint32_t sum = 0;
+  for (int i = 0; i < 10; i++) {
+    sum += analogRead(VBAT_PIN);
+    delayMicroseconds(100);
+  }
+
+  float v = (sum / 10.0f / 4095.0f) * 3.3f * VBAT_DIVIDER;
+  vbatVoltage = v;
+  Serial.print("Vbat=");
+  Serial.print(vbatVoltage, 1);
+  Serial.println("V");
+}
+
+// Quick ADC read: single sample, no delays
+// Safe to call during movement (e.g. endstop bounce)
+void vbatReadQuick() {
+  int raw = analogRead(VBAT_PIN);
+  float v = (raw / 4095.0f) * 3.3f * VBAT_DIVIDER;
+  vbatVoltage = vbatVoltage * 0.7f + v * 0.3f;  // heavier smoothing
+}
+
+int vbatPercent() {
+  int pct = (int)((vbatVoltage - VBAT_EMPTY) / (VBAT_FULL - VBAT_EMPTY) * 100);
+  return constrain(pct, 0, 100);
 }
 
 void adxlInit() {

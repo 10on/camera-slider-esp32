@@ -16,10 +16,12 @@
 #define EN_PIN    0
 #define STEP_PIN  1
 #define DIR_PIN   2
-#define ENDSTOP_1_GPIO 3   // direct GPIO endstop (fallback)
+#define VBAT_PIN  3        // ADC: motor supply voltage via resistor divider
+#define VBAT_DIVIDER 5.09f // calibrated against multimeter
+#define VBAT_FULL  12.6f   // 3S LiPo fully charged (4.2V × 3)
+#define VBAT_EMPTY  9.0f   // 3S LiPo empty (3.0V × 3)
 #define UART_TX   4
 #define UART_RX   5
-#define ENDSTOP_2_GPIO 8   // direct GPIO endstop (fallback)
 
 // ── I2C ──
 #define SDA_PIN   8
@@ -30,6 +32,7 @@
 #define PCF_ENC_CLK   2
 #define PCF_ENC_DT    3
 #define PCF_ENC_SW    4
+#define PCF_LED2      7
 #define PCF_ENDSTOP_1 5   // active LOW
 #define PCF_ENDSTOP_2 6   // active LOW
 
@@ -213,10 +216,13 @@ bool    encSwPrev  = HIGH;
 unsigned long encPressTime = 0;
 bool    encLongFired = false;
 
+// ── Battery voltage ──
+float vbatVoltage = 0;
+unsigned long lastVbatRead = 0;
+
 // ── ADXL345 ──
 float adxlX = 0, adxlY = 0, adxlZ = 0;
-bool  adxlMotionDetected = false;
-int8_t adxlMotionDir = 0;  // -1 or +1
+int8_t adxlMotionDir = 0;  // -1 or +1, set by adxlCheckDrift()
 
 // ── Display / Menu ──
 MenuScreen currentScreen = SCREEN_MAIN;
@@ -237,7 +243,6 @@ const char* const* editValueNames = NULL;  // optional text labels for values
 
 // ── Timing ──
 unsigned long lastBleNotify   = 0;
-unsigned long lastAdxlCheck   = 0;
 unsigned long lastActivityTime = 0;
 
 // ── Backoff ──
@@ -260,7 +265,7 @@ void encoderPoll();
 void homingUpdate();
 void homingStart();
 void adxlInit();
-void adxlCheckMotion();
+bool adxlCheckDrift(uint16_t durationMs);
 void bleInit();
 void bleStatusNotify();
 void ledUpdate();
@@ -306,12 +311,10 @@ void loop() {
     homingUpdate();
   }
 
-  // 6. ADXL motion check (only in IDLE/SLEEP, every 100ms)
-  if ((sliderState == STATE_IDLE || sliderState == STATE_SLEEP) && adxlFound) {
-    if (millis() - lastAdxlCheck > 100) {
-      adxlCheckMotion();
-      lastAdxlCheck = millis();
-    }
+  // 6. Battery voltage (every 5s, only when motor idle)
+  if (!motorRunning && millis() - lastVbatRead > 5000) {
+    vbatReadPrecise();
+    lastVbatRead = millis();
   }
 
   // 7. BLE status notify (every 100ms)

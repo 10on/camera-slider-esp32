@@ -163,6 +163,7 @@ void handleEndstopHit() {
 
       case ENDSTOP_BOUNCE:
         motorStopNow();
+        vbatReadQuick();  // grab voltage while motor is briefly stopped
         // Reverse direction and restart
         {
           bool newForward = motorDirection;  // motorDirection is inverted (true=backward)

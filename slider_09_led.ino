@@ -4,6 +4,10 @@ static LedPattern currentLedPattern = LED_OFF;
 static unsigned long ledLastToggle = 0;
 static bool ledState = false;
 
+// LED2 (battery indicator)
+static bool led2State = true;
+static unsigned long led2BlinkTime = 0;
+
 void ledSetPattern(LedPattern pat) {
   currentLedPattern = pat;
 }
@@ -65,9 +69,42 @@ void ledUpdate() {
     } else {
       pcfOutputState &= ~(1 << PCF_LED);  // LED off (LOW)
     }
-    // Ensure all other pins stay HIGH (pull-up for inputs)
-    pcfOutputState |= 0xFC;  // P2-P7 HIGH
+    // Ensure input pins stay HIGH (pull-up)
+    pcfOutputState |= 0x7C;  // P2-P6 HIGH (inputs pull-up)
     pcfOutputState |= 0x01;  // P0 HIGH
-    // pcfPoll() will write this on next loop
+  }
+
+  // ── LED2: battery indicator ──
+  bool newLed2 = led2State;
+  int bp = vbatPercent();
+
+  if (bp > 50) {
+    // High charge: always on
+    newLed2 = true;
+  } else if (bp > 10) {
+    // Medium: on, blink off once per minute (200ms off)
+    if (now - led2BlinkTime > 60000) {
+      newLed2 = false;
+      led2BlinkTime = now;
+    } else if (now - led2BlinkTime > 200) {
+      newLed2 = true;
+    }
+  } else {
+    // Low: on, blink off once per 10s (200ms off)
+    if (now - led2BlinkTime > 10000) {
+      newLed2 = false;
+      led2BlinkTime = now;
+    } else if (now - led2BlinkTime > 200) {
+      newLed2 = true;
+    }
+  }
+
+  if (newLed2 != led2State) {
+    led2State = newLed2;
+    if (led2State) {
+      pcfOutputState |= (1 << PCF_LED2);
+    } else {
+      pcfOutputState &= ~(1 << PCF_LED2);
+    }
   }
 }
