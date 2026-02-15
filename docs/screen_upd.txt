@@ -1,0 +1,67 @@
+Шаг 1: Заменяем Adafruit includes и глобальные переменные в slider.ino:
+Edit/home/user/camera-slider-esp32/slider.ino
++1-2
+#include <Adafruit_GFX.h>
+#include <Adafruit_SSD1306.h>
+#include <U8g2lib.h>
+Edit/home/user/camera-slider-esp32/slider.ino
++3-4
+// ── OLED ──
+#define SCREEN_WIDTH  128
+#define SCREEN_HEIGHT 64
+#define OLED_RESET    -1
+
+Now replace the Adafruit_SSD1306* global with U8g2 pointer:
+Edit/home/user/camera-slider-esp32/slider.ino
++1-1
+Adafruit_SSD1306* oled = NULL;
+U8G2_SSD1306_128X64_NONAME_F_HW_I2C* oled = NULL;
+Update Todos
+ Replace Adafruit_SSD1306 with U8g2 in slider.ino (includes, globals, forward declarations)
+ Updating OLED initialization in hwInit()
+ Rewrite slider_10_display.ino for U8g2 API (fonts, drawBox, updateDisplay)
+ Update slider_12_sleep.ino sleep/wake OLED commands for U8g2
+ Commit and push all changes
+
+Шаг 2: Обновляем инициализацию OLED в hwInit():
+Edit/home/user/camera-slider-esp32/slider_02_hw.ino
++16-16
+  // ── OLED autodetect ──
+  oled = new Adafruit_SSD1306(SCREEN_WIDTH, SCREEN_HEIGHT, &Wire, OLED_RESET);
+  if (oled->begin(SSD1306_SWITCHCAPVCC, 0x3C)) {
+    oledFound = true;
+    oled->clearDisplay();
+    oled->setTextColor(SSD1306_WHITE);
+    oled->setTextSize(1);
+    oled->setCursor(20, 28);
+    oled->print("Camera Slider");
+    oled->display();
+    Serial.println("OLED OK at 0x3C");
+  } else {
+    delete oled;
+    oled = NULL;
+    Serial.println("OLED not found");
+  {
+    Wire.beginTransmission(0x3C);
+    if (Wire.endTransmission() == 0) {
+      oled = new U8G2_SSD1306_128X64_NONAME_F_HW_I2C(U8G2_R0, /* reset=*/ U8X8_PIN_NONE);
+      oled->begin();
+Update Todos
+ Replace Adafruit_SSD1306 with U8g2 in slider.ino (includes, globals, forward declarations)
+ Update hwInit() OLED section to use U8g2 constructor and init
+ Rewriting display rendering for U8g2
+ Update slider_12_sleep.ino sleep/wake OLED commands for U8g2
+ Commit and push all changes
+
+Шаг 3: Полная перезапись slider_10_display.ino на U8g2 API.
+
+Ключевые изменения:
+
+    clearDisplay() → clearBuffer()
+    display() → updateDisplay() (только изменённые тайлы!)
+    setTextSize(N) → setFont(...) с подходящим шрифтом
+    setCursor(x, y) → y теперь по baseline (нижний край текста), не по верхнему
+    fillRect() → drawBox(), drawRect() → drawFrame()
+    setTextColor(BLACK) → setDrawColor(0)
+    Расчёт ширины текста → getStrWidth()
+
