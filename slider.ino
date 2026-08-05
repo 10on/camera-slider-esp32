@@ -58,6 +58,8 @@
 #define SPEED_UUID     "d8de624e-140f-4a22-8594-e2216b84a5f2"
 #define POSITION_UUID  "a1b2c3d4-e5f6-4789-a012-3456789abcde"
 #define CURRENT_UUID   "f1e2d3c4-b5a6-4978-9012-3456789abcde"
+// Read-only config snapshot over BLE
+#define CONFIG_UUID    "c0f1g000-0000-0000-0000-00000000c0de"
 
 // ── State machine ──
 enum SliderState {
@@ -141,6 +143,7 @@ BLECharacteristic* pStatusChar   = NULL;
 BLECharacteristic* pSpeedChar    = NULL;
 BLECharacteristic* pPositionChar = NULL;
 BLECharacteristic* pCurrentChar  = NULL;
+BLECharacteristic* pConfigChar   = NULL;
 
 volatile bool bleConnected     = false;
 volatile bool bleWasConnected  = false;

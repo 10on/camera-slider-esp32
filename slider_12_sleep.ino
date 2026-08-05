@@ -20,7 +20,7 @@ void sleepParkAndEnter() {
   digitalWrite(EN_PIN, HIGH);  // disable holding
   delay(100);                  // let mechanics settle
 
-  if (adxlCheckDrift(3000)) {
+  if (adxlCheckDrift(5000)) {
     // Slider is drifting! Re-enable and park toward drift direction
     
     digitalWrite(EN_PIN, LOW);
@@ -46,7 +46,7 @@ void sleepParkAndEnter() {
     digitalWrite(EN_PIN, HIGH);
     delay(100);
 
-    if (adxlCheckDrift(3000)) {
+    if (adxlCheckDrift(5000)) {
       // Still drifting — try opposite endstop
       
       digitalWrite(EN_PIN, LOW);

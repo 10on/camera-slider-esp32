@@ -89,13 +89,23 @@
     function dvLE16(v){ const dv=new DataView(new ArrayBuffer(2)); dv.setUint16(0, v, true); return dv; }
     function dvLE32(v){ const dv=new DataView(new ArrayBuffer(4)); dv.setInt32(0, v, true); return dv; }
 
-    async function cmd(c){ if(!chCommand) return; await chCommand.writeValue(new TextEncoder().encode(c)); }
-    async function setSpeed(){ const v=+document.getElementById('speed').value|0; if(!chSpeed) return; await chSpeed.writeValue(dvLE16(v)); }
-    async function setCurrent(){ const v=+document.getElementById('current').value|0; if(!chCurrent) return; await chCurrent.writeValue(dvLE16(v)); }
-    async function goTo(){ const v=+document.getElementById('pos').value|0; if(!chPos) return; await chPos.writeValue(dvLE32(v)); }
+    function stopPingUI(){
+      if(pingActive){
+        pingActive = false; pingLastTarget = null;
+        document.getElementById('pingBadge').textContent = 'Stopped';
+        document.getElementById('pingBadge').className = 'badge';
+        log('Ping-Pong stopped (manual command)');
+      }
+    }
+
+    async function cmd(c){ if(!chCommand) return; stopPingUI(); await chCommand.writeValue(new TextEncoder().encode(c)); }
+    async function setSpeed(){ const v=+document.getElementById('speed').value|0; if(!chSpeed) return; stopPingUI(); await chSpeed.writeValue(dvLE16(v)); }
+    async function setCurrent(){ const v=+document.getElementById('current').value|0; if(!chCurrent) return; stopPingUI(); await chCurrent.writeValue(dvLE16(v)); }
+    async function goTo(){ const v=+document.getElementById('pos').value|0; if(!chPos) return; stopPingUI(); await chPos.writeValue(dvLE32(v)); }
     async function goHomeCenter(){
       if(lastTravel <= 0){ log('Not calibrated: no travel distance'); return; }
       const center = Math.round(lastTravel/2);
+      stopPingUI();
       await goToTarget(center);
       log('Go Home (Center): ' + center);
     }

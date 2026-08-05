@@ -26,7 +26,20 @@ class CommandCallbacks : public BLECharacteristicCallbacks {
       case 'F': cmdForward = true; break;
       case 'B': cmdBackward = true; break;
       case 'S': cmdStop = true; break;
-      case 'H': cmdHome = true; break;
+      case 'H': cmdHome = true; break;        // full homing (calibration)
+      case 'G': // Go to saved home (center or explicit savedHome if present)
+        if (isCalibrated) {
+          int32_t target = (cfg.savedHome != 0 || centerPosition == 0) ? cfg.savedHome : centerPosition;
+          cmdTargetPos = target;
+          cmdGoToPos = true;
+        }
+        break;
+      case 'Z': // Set saved home to current position
+        cfg.savedHome = currentPosition;
+        preferences.begin("slider", false);
+        preferences.putLong("homePos", cfg.savedHome);
+        preferences.end();
+        break;
       case 'R': // Reset error
         if (sliderState == STATE_ERROR) {
           stateResetError();
@@ -114,6 +127,13 @@ void bleInit() {
   );
   pCurrentChar->setCallbacks(new CurrentCallbacks());
 
+  // Config snapshot (read/notify)
+  pConfigChar = pService->createCharacteristic(
+    CONFIG_UUID,
+    BLECharacteristic::PROPERTY_READ | BLECharacteristic::PROPERTY_NOTIFY
+  );
+  pConfigChar->addDescriptor(new BLE2902());
+
   pService->start();
 
   BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
@@ -167,4 +187,33 @@ void bleStatusNotify() {
 
   pStatusChar->setValue(status, 11);
   pStatusChar->notify();
+
+  // Update config snapshot (24 bytes)
+  uint8_t cfgbuf[24];
+  // 0-3: savedHome
+  *(int32_t*)&cfgbuf[0] = cfg.savedHome;
+  // 4-7: centerPosition
+  *(int32_t*)&cfgbuf[4] = centerPosition;
+  // 8-11: travelDistance
+  *(int32_t*)&cfgbuf[8] = travelDistance;
+  // 12-13: speed
+  cfgbuf[12] = cfg.speed & 0xFF; cfgbuf[13] = (cfg.speed >> 8) & 0xFF;
+  // 14-15: motorCurrent
+  cfgbuf[14] = cfg.motorCurrent & 0xFF; cfgbuf[15] = (cfg.motorCurrent >> 8) & 0xFF;
+  // 16: microsteps
+  cfgbuf[16] = cfg.microsteps;
+  // 17: endstopMode
+  cfgbuf[17] = cfg.endstopMode;
+  // 18-19: rampSteps
+  cfgbuf[18] = cfg.rampSteps & 0xFF; cfgbuf[19] = (cfg.rampSteps >> 8) & 0xFF;
+  // 20-21: sleepTimeout
+  cfgbuf[20] = cfg.sleepTimeout & 0xFF; cfgbuf[21] = (cfg.sleepTimeout >> 8) & 0xFF;
+  // 22: adxlSensitivity
+  cfgbuf[22] = cfg.adxlSensitivity;
+  // 23: wakeOnMotion
+  cfgbuf[23] = cfg.wakeOnMotion ? 1 : 0;
+  if (pConfigChar) {
+    pConfigChar->setValue(cfgbuf, sizeof(cfgbuf));
+    pConfigChar->notify();
+  }
 }
