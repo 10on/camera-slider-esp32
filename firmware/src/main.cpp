@@ -5,6 +5,8 @@
 #include <Adafruit_ST7735.h>
 #include <SPI.h>
 #include <TMCStepper.h>
+#include <Wire.h>
+#include <Adafruit_INA219.h>
 
 // ── TFT (VSPI) ──
 #define TFT_CS   5
@@ -42,6 +44,73 @@ uint8_t backlightBrightness = 200; // 0-255, adjusted live via BTN1 (dimmer) / B
 
 HardwareSerial TMCSerial(1);
 TMC2209Stepper driver(&TMCSerial, R_SENSE, DRIVER_ADDR);
+
+// ── I2C bus (ADXL345 + INA219) ──
+#define I2C_SDA 21
+#define I2C_SCL 22
+
+// ── ADXL345, register-level access (ported from slider_02_hw.ino / slider_07_adxl.ino) ──
+#define REG_DEVID       0x00
+#define REG_POWER_CTL   0x2D
+#define REG_BW_RATE     0x2C
+#define REG_DATA_FORMAT 0x31
+#define REG_DATAX0      0x32
+
+bool    adxlFound = false;
+uint8_t adxlAddr  = 0;
+float   adxlX = 0, adxlY = 0, adxlZ = 0;
+
+void adxlWriteReg(uint8_t reg, uint8_t value) {
+  Wire.beginTransmission(adxlAddr);
+  Wire.write(reg);
+  Wire.write(value);
+  Wire.endTransmission();
+}
+
+void adxlInit() {
+  for (uint8_t addr : {0x53, 0x1D}) {
+    Wire.beginTransmission(addr);
+    if (Wire.endTransmission() != 0) continue;
+
+    Wire.beginTransmission(addr);
+    Wire.write(REG_DEVID);
+    Wire.endTransmission(false);
+    Wire.requestFrom(addr, (uint8_t)1);
+    uint8_t devid = Wire.read();
+
+    if (devid == 0xE5) {
+      adxlAddr = addr;
+      adxlFound = true;
+      adxlWriteReg(REG_DATA_FORMAT, 0x08); // full resolution, +-2g
+      adxlWriteReg(REG_BW_RATE, 0x0A);     // 100 Hz
+      adxlWriteReg(REG_POWER_CTL, 0x08);   // measurement mode
+      delay(50);
+      return;
+    }
+  }
+}
+
+void adxlReadAxes() {
+  if (!adxlFound) return;
+  Wire.beginTransmission(adxlAddr);
+  Wire.write(REG_DATAX0);
+  Wire.endTransmission(false);
+  Wire.requestFrom(adxlAddr, (uint8_t)6);
+
+  int16_t raw_x = Wire.read() | (Wire.read() << 8);
+  int16_t raw_y = Wire.read() | (Wire.read() << 8);
+  int16_t raw_z = Wire.read() | (Wire.read() << 8);
+
+  adxlX = raw_x * 0.0039f; // 3.9 mg/LSB, full resolution +-2g
+  adxlY = raw_y * 0.0039f;
+  adxlZ = raw_z * 0.0039f;
+}
+
+// ── INA219 (current/voltage) ──
+Adafruit_INA219 ina219;
+bool  ina219Found   = false;
+float busVoltage_V  = 0;
+float current_mA    = 0;
 
 Adafruit_ST7735 tft(TFT_CS, TFT_DC, TFT_RST);
 
@@ -111,11 +180,23 @@ struct StatusRow {
   StatusRow(int y_, const char* label_) : y(y_), label(label_) {}
 };
 
-StatusRow rowEncSw(64, "ENC SW");
-StatusRow rowBtn1(76, "BTN1");
-StatusRow rowBtn2(88, "BTN2");
-StatusRow rowEs1(100, "ENDSTOP1");
-StatusRow rowEs2(112, "ENDSTOP2");
+StatusRow rowEncSw(53, "ENC SW");
+StatusRow rowBtn1(64, "BTN1");
+StatusRow rowBtn2(75, "BTN2");
+StatusRow rowEs1(86, "ENDSTOP1");
+StatusRow rowEs2(97, "ENDSTOP2");
+
+// Plain text rows (not boolean), redrawn every sensor read cycle
+const int ROW_POWER_Y = 108;
+const int ROW_ADXL_Y  = 119;
+
+void drawTextRow(int y, const char* text) {
+  tft.fillRect(0, y, 160, 10, COL_BG);
+  tft.setTextSize(1);
+  tft.setCursor(4, y);
+  tft.setTextColor(COL_VAL);
+  tft.print(text);
+}
 
 void drawStatic() {
   tft.fillScreen(COL_BG);
@@ -148,9 +229,9 @@ void render() {
   if (encoderCount != lastDrawnCount) {
     char buf[16];
     snprintf(buf, sizeof(buf), "%ld", (long)encoderCount);
-    tft.fillRect(4, 34, 156, 24, COL_BG);
+    tft.fillRect(4, 34, 156, 16, COL_BG);
     tft.setTextColor(COL_VAL);
-    tft.setTextSize(3);
+    tft.setTextSize(2);
     tft.setCursor(4, 34);
     tft.print(buf);
     lastDrawnCount = encoderCount;
@@ -204,6 +285,10 @@ void setup() {
   // not for a runtime pinMode() change, so parking MISO there is safe.
   SPI.begin(18 /*SCK*/, 12 /*MISO -> unused pin, NOT GPIO19*/, 23 /*MOSI*/, TFT_CS);
 
+  Wire.begin(I2C_SDA, I2C_SCL);
+  adxlInit();
+  ina219Found = ina219.begin(&Wire);
+
   tft.initR(INITR_BLACKTAB);
   tft.setRotation(1);
 
@@ -248,4 +333,28 @@ void loop() {
   // LEDs mirror endstops directly: LED lights while its endstop is triggered
   digitalWrite(LED_STATUS,  es1In.state ? HIGH : LOW);
   digitalWrite(LED_BATTERY, es2In.state ? HIGH : LOW);
+
+  // INA219 (power) + ADXL345 (tilt), throttled -- I2C reads are too slow for every loop() pass
+  static unsigned long lastSensorRead = 0;
+  if (millis() - lastSensorRead > 200) {
+    lastSensorRead = millis();
+    char buf[32];
+
+    if (ina219Found) {
+      busVoltage_V = ina219.getBusVoltage_V();
+      current_mA   = ina219.getCurrent_mA();
+      snprintf(buf, sizeof(buf), "%.2fV  %.0fmA", busVoltage_V, current_mA);
+    } else {
+      snprintf(buf, sizeof(buf), "INA219 not found");
+    }
+    drawTextRow(ROW_POWER_Y, buf);
+
+    if (adxlFound) {
+      adxlReadAxes();
+      snprintf(buf, sizeof(buf), "X%.2f Y%.2f Z%.2f", adxlX, adxlY, adxlZ);
+    } else {
+      snprintf(buf, sizeof(buf), "ADXL345 not found");
+    }
+    drawTextRow(ROW_ADXL_Y, buf);
+  }
 }
