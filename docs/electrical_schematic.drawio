@@ -1,80 +1,61 @@
-<?xml version="1.0" encoding="UTF-8"?>
-<mxfile host="app.diagrams.net" version="21.0.0">
-
-  <!-- =====================================================================
-       СТРАНИЦА 1: Сигнальная схема (логика, пины)
-       ===================================================================== -->
+<mxfile host="Electron" agent="Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) draw.io/29.6.6 Chrome/144.0.7559.236 Electron/40.8.4 Safari/537.36" version="29.6.6" pages="2">
   <diagram id="page_logic" name="Сигнальная схема">
     <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-
         <!-- TITLE -->
         <mxCell id="2" value="Camera Slider — Electrical Block Diagram" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;" vertex="1" parent="1">
           <mxGeometry x="300" y="20" width="620" height="40" as="geometry" />
         </mxCell>
-
         <!-- ESP32 -->
         <mxCell id="esp32" value="&lt;b&gt;ESP32 Dev Module&lt;/b&gt;&lt;br&gt;──────────────────&lt;br&gt;GPIO 0  ➜  EN (TMC2209)&lt;br&gt;GPIO 1  ➜  STEP&lt;br&gt;GPIO 2  ➜  DIR&lt;br&gt;GPIO 4  ➜  UART TX (TMC2209)&lt;br&gt;GPIO 5  ←  UART RX (TMC2209)&lt;br&gt;──────────────────&lt;br&gt;GPIO 8  ⇄  I2C SDA&lt;br&gt;GPIO 9  ⇄  I2C SCL&lt;br&gt;──────────────────&lt;br&gt;GPIO 3  ←  VBAT ADC" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;verticalAlign=top;spacingTop=8;align=center;" vertex="1" parent="1">
           <mxGeometry x="430" y="175" width="220" height="285" as="geometry" />
         </mxCell>
-
         <!-- TMC2209 -->
         <mxCell id="tmc2209" value="&lt;b&gt;TMC2209&lt;/b&gt;&lt;br&gt;Stepper Driver&lt;br&gt;──────────────────&lt;br&gt;← EN / STEP / DIR&lt;br&gt;⇄ UART (addr 0b00)&lt;br&gt;──────────────────&lt;br&gt;R_SENSE = 0.11 Ω&lt;br&gt;StealthChop&lt;br&gt;800 mA default&lt;br&gt;32 µsteps default" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=12;verticalAlign=top;spacingTop=8;" vertex="1" parent="1">
           <mxGeometry x="800" y="180" width="190" height="200" as="geometry" />
         </mxCell>
-
         <!-- NEMA17 Motor -->
         <mxCell id="motor" value="&lt;b&gt;NEMA17&lt;/b&gt;&lt;br&gt;Stepper Motor&lt;br&gt;4-wire (A1/A2/B1/B2)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
           <mxGeometry x="1070" y="230" width="170" height="75" as="geometry" />
         </mxCell>
-
         <!-- SSD1306 OLED -->
         <mxCell id="oled" value="&lt;b&gt;SSD1306 OLED&lt;/b&gt;&lt;br&gt;128×64 px&lt;br&gt;I2C addr 0x3C" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
           <mxGeometry x="800" y="60" width="190" height="75" as="geometry" />
         </mxCell>
-
         <!-- ADXL345 -->
         <mxCell id="adxl" value="&lt;b&gt;ADXL345&lt;/b&gt;&lt;br&gt;Accelerometer&lt;br&gt;I2C addr 0x53 / 0x1D&lt;br&gt;±2g, 100 Hz, full-res" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=12;" vertex="1" parent="1">
           <mxGeometry x="800" y="440" width="190" height="85" as="geometry" />
         </mxCell>
-
         <!-- PCF8574 -->
         <mxCell id="pcf" value="&lt;b&gt;PCF8574&lt;/b&gt;&lt;br&gt;I/O Expander&lt;br&gt;I2C addr 0x20 / 0x21&lt;br&gt;──────────────────&lt;br&gt;P0 — н/п (пин сломан)&lt;br&gt;P1  ➜  LED Status&lt;br&gt;P2  ←  ENC_CLK&lt;br&gt;P3  ←  ENC_DT&lt;br&gt;P4  ←  ENC_SW (кнопка)&lt;br&gt;P5  ←  ENDSTOP_1&lt;br&gt;P6  ←  ENDSTOP_2&lt;br&gt;P7  ➜  LED Battery" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;verticalAlign=top;spacingTop=8;align=left;spacingLeft=10;" vertex="1" parent="1">
           <mxGeometry x="110" y="175" width="210" height="285" as="geometry" />
         </mxCell>
-
         <!-- Rotary Encoder -->
         <mxCell id="encoder" value="&lt;b&gt;Rotary Encoder&lt;/b&gt;&lt;br&gt;CLK / DT / SW" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
           <mxGeometry x="-120" y="180" width="170" height="60" as="geometry" />
         </mxCell>
-
         <!-- ENDSTOP 1 -->
         <mxCell id="es1" value="&lt;b&gt;ENDSTOP 1&lt;/b&gt;&lt;br&gt;active LOW  (P5)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
           <mxGeometry x="-120" y="270" width="170" height="55" as="geometry" />
         </mxCell>
-
         <!-- ENDSTOP 2 -->
         <mxCell id="es2" value="&lt;b&gt;ENDSTOP 2&lt;/b&gt;&lt;br&gt;active LOW  (P6)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
           <mxGeometry x="-120" y="345" width="170" height="55" as="geometry" />
         </mxCell>
-
         <!-- LED Status -->
         <mxCell id="led1" value="&lt;b&gt;LED Status&lt;/b&gt;  (P1)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
           <mxGeometry x="-120" y="420" width="170" height="50" as="geometry" />
         </mxCell>
-
         <!-- LED Battery -->
         <mxCell id="led2" value="&lt;b&gt;LED Battery&lt;/b&gt;  (P7)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
           <mxGeometry x="-120" y="490" width="170" height="50" as="geometry" />
         </mxCell>
-
         <!-- VBAT ADC note -->
         <mxCell id="bat" value="&lt;b&gt;3S LiPo Battery&lt;/b&gt;&lt;br&gt;9.0 – 12.6 V&lt;br&gt;÷5.09 резистивный делитель → GPIO 3" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
           <mxGeometry x="430" y="530" width="220" height="70" as="geometry" />
         </mxCell>
-
         <!-- CONNECTIONS -->
         <mxCell id="ce1" value="GPIO 0/1/2: EN / STEP / DIR" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;strokeWidth=2;fontSize=10;exitX=1;exitY=0.25;exitDx=0;exitDy=0;entryX=0;entryY=0.25;entryDx=0;entryDy=0;" edge="1" source="esp32" target="tmc2209" parent="1">
           <mxGeometry relative="1" as="geometry" />
@@ -122,7 +103,6 @@
         <mxCell id="ce12" value="GPIO 3 ADC" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;strokeWidth=2;fontSize=10;" edge="1" source="bat" target="esp32" parent="1">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
         <!-- LEGEND -->
         <mxCell id="leg_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;" vertex="1" parent="1">
           <mxGeometry x="1060" y="370" width="175" height="290" as="geometry" />
@@ -148,264 +128,160 @@
         <mxCell id="leg6" value="Механика (мотор)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
           <mxGeometry x="1075" y="607" width="145" height="30" as="geometry" />
         </mxCell>
-
         <!-- I2C note -->
         <mxCell id="i2c_note" value="I2C шина (SDA GPIO8 / SCL GPIO9): PCF8574 + OLED + ADXL345 параллельно" style="text;html=1;strokeColor=#82b366;fillColor=#f6ffed;align=left;verticalAlign=middle;whiteSpace=wrap;rounded=1;fontSize=11;" vertex="1" parent="1">
           <mxGeometry x="430" y="625" width="360" height="40" as="geometry" />
         </mxCell>
-
       </root>
     </mxGraphModel>
   </diagram>
-
-  <!-- =====================================================================
-       СТРАНИЦА 2: Силовая схема (питание)
-       ===================================================================== -->
   <diagram id="page_power" name="Силовая схема">
-    <mxGraphModel dx="1422" dy="762" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
+    <mxGraphModel dx="885" dy="1845" grid="1" gridSize="10" guides="1" tooltips="1" connect="1" arrows="1" fold="1" page="1" pageScale="1" pageWidth="1654" pageHeight="1169" math="0" shadow="0">
       <root>
         <mxCell id="0" />
         <mxCell id="1" parent="0" />
-
-        <!-- TITLE -->
-        <mxCell id="p_title" value="Camera Slider — Силовая схема" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="300" y="20" width="700" height="40" as="geometry" />
+        <mxCell id="p_title" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;verticalAlign=middle;whiteSpace=wrap;rounded=0;fontSize=20;fontStyle=1;" value="Camera Slider — Силовая схема" vertex="1">
+          <mxGeometry height="40" width="700" x="300" y="20" as="geometry" />
         </mxCell>
-
-        <!-- ── ВНЕШНЕЕ ПИТАНИЕ ── -->
-
-        <!-- USB-C PD Trigger -->
-        <mxCell id="pd" value="&lt;b&gt;USB-C PD Trigger&lt;/b&gt;&lt;br&gt;Выход: 12 V&lt;br&gt;(программируемый)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="40" y="90" width="175" height="75" as="geometry" />
+        <mxCell id="pd" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;" value="&lt;b&gt;USB-C PD Trigger&lt;/b&gt;&lt;br&gt;Выход: 12 V&lt;br&gt;(программируемый)" vertex="1">
+          <mxGeometry height="75" width="175" x="40" y="90" as="geometry" />
         </mxCell>
-
-        <!-- MT3608 Boost Converter -->
-        <mxCell id="boost" value="&lt;b&gt;MT3608 Boost&lt;/b&gt;&lt;br&gt;12 V → 12.16 V&lt;br&gt;(чуть выше разряженной батареи)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="280" y="90" width="195" height="75" as="geometry" />
+        <mxCell id="boost" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=12;" value="&lt;b&gt;MT3608 Boost&lt;/b&gt;&lt;br&gt;12 V → 12.16 V&lt;br&gt;(чуть выше разряженной батареи)" vertex="1">
+          <mxGeometry height="75" width="195" x="280" y="90" as="geometry" />
         </mxCell>
-
-        <!-- Junction node: выход буст-конвертера (12.16V) -->
-        <mxCell id="junc_boost" value="12.16 V" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;strokeColor=#000000;fontColor=#ffffff;fontSize=10;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="527" y="117" width="60" height="30" as="geometry" />
+        <mxCell id="junc_boost" parent="1" style="ellipse;whiteSpace=wrap;html=1;fillColor=#000000;strokeColor=#000000;fontColor=#ffffff;fontSize=10;fontStyle=1;" value="12.16 V" vertex="1">
+          <mxGeometry height="30" width="60" x="527" y="117" as="geometry" />
         </mxCell>
-
-        <!-- ── ЗАРЯДНЫЙ ПУТЬ (ветка 1) ── -->
-
-        <!-- R-assembly + Schottky -->
-        <mxCell id="rschottky" value="&lt;b&gt;R-сборка + диод Шоттки&lt;/b&gt;&lt;br&gt;ограничение тока заряда" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="640" y="90" width="200" height="75" as="geometry" />
+        <mxCell id="rschottky" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=12;" value="&lt;b&gt;R-сборка + диод Шоттки&lt;/b&gt;&lt;br&gt;ограничение тока заряда" vertex="1">
+          <mxGeometry height="75" width="200" x="640" y="90" as="geometry" />
         </mxCell>
-
-        <!-- BMS -->
-        <mxCell id="bms" value="&lt;b&gt;BMS&lt;/b&gt;&lt;br&gt;Battery Management System&lt;br&gt;──────────────────&lt;br&gt;защита: перезаряд,&lt;br&gt;переразряд, КЗ&lt;br&gt;──────────────────&lt;br&gt;B+ / B- → ячейки&lt;br&gt;P+ / P- → нагрузка" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=12;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="910" y="60" width="185" height="185" as="geometry" />
+        <mxCell id="bms" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=12;verticalAlign=top;spacingTop=6;" value="&lt;b&gt;BMS&lt;/b&gt;&lt;br&gt;Battery Management System&lt;br&gt;──────────────────&lt;br&gt;защита: перезаряд,&lt;br&gt;переразряд, КЗ&lt;br&gt;──────────────────&lt;br&gt;B+ / B- → ячейки&lt;br&gt;P+ / P- → нагрузка" vertex="1">
+          <mxGeometry height="185" width="185" x="910" y="60" as="geometry" />
         </mxCell>
-
-        <!-- Battery cells -->
-        <mxCell id="cells" value="&lt;b&gt;3× Li-ion 1500 mAh&lt;/b&gt;&lt;br&gt;соединение: последовательно&lt;br&gt;──────────────────&lt;br&gt;Umin = 9.0 V  (3 × 3.0 V)&lt;br&gt;Unom = 11.1 V  (3 × 3.7 V)&lt;br&gt;Umax = 12.6 V  (3 × 4.2 V)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="1165" y="70" width="210" height="155" as="geometry" />
+        <mxCell id="cells" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=12;verticalAlign=top;spacingTop=6;" value="&lt;b&gt;3× Li-ion 1500 mAh&lt;/b&gt;&lt;br&gt;соединение: последовательно&lt;br&gt;──────────────────&lt;br&gt;Umin = 9.0 V  (3 × 3.0 V)&lt;br&gt;Unom = 11.1 V  (3 × 3.7 V)&lt;br&gt;Umax = 12.6 V  (3 × 4.2 V)" vertex="1">
+          <mxGeometry height="155" width="210" x="1290" y="-135" as="geometry" />
         </mxCell>
-
-        <!-- ── СИЛОВАЯ ШИНА ── -->
-
-        <!-- Ideal Diode 1 (external → main rail) -->
-        <mxCell id="id1" value="&lt;b&gt;Идеальный диод 1&lt;/b&gt;&lt;br&gt;(MOSFET + компаратор)&lt;br&gt;внешнее питание → шина" style="shape=mxgraph.electrical.signal_sources.diode;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;rotation=90;" vertex="1" parent="1">
-          <mxGeometry x="527" y="200" width="60" height="100" as="geometry" />
+        <mxCell id="id1" parent="1" style="shape=mxgraph.electrical.signal_sources.diode;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;rotation=90;" value="&lt;b&gt;Идеальный диод 1&lt;/b&gt;&lt;br&gt;(MOSFET + компаратор)&lt;br&gt;внешнее питание → шина" vertex="1">
+          <mxGeometry height="100" width="60" x="527" y="200" as="geometry" />
         </mxCell>
-
-        <!-- Ideal Diode 2 (BMS discharge → main rail) -->
-        <mxCell id="id2" value="&lt;b&gt;Идеальный диод 2&lt;/b&gt;&lt;br&gt;(MOSFET + компаратор)&lt;br&gt;батарея (BMS) → шина" style="shape=mxgraph.electrical.signal_sources.diode;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;rotation=90;" vertex="1" parent="1">
-          <mxGeometry x="910" y="290" width="60" height="100" as="geometry" />
+        <mxCell id="id2" parent="1" style="shape=mxgraph.electrical.signal_sources.diode;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;rotation=90;" value="&lt;b&gt;Идеальный диод 2&lt;/b&gt;&lt;br&gt;(MOSFET + компаратор)&lt;br&gt;батарея (BMS) → шина" vertex="1">
+          <mxGeometry height="100" width="60" x="910" y="290" as="geometry" />
         </mxCell>
-
-        <!-- Main Power Rail -->
-        <mxCell id="rail" value="ОСНОВНАЯ СИЛОВАЯ ШИНА  ~12 – 12.6 V&lt;br&gt;&lt;i&gt;(питается от того источника, у кого выше напряжение)&lt;/i&gt;" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=1;strokeWidth=3;" vertex="1" parent="1">
-          <mxGeometry x="280" y="430" width="780" height="55" as="geometry" />
+        <mxCell id="rail" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=1;strokeWidth=3;" value="ОСНОВНАЯ СИЛОВАЯ ШИНА  ~12 – 12.6 V&lt;br&gt;&lt;i&gt;(питается от того источника, у кого выше напряжение)&lt;/i&gt;" vertex="1">
+          <mxGeometry height="55" width="780" x="280" y="430" as="geometry" />
         </mxCell>
-
-        <!-- ── НАГРУЗКИ ── -->
-
-        <!-- B560 Mini Buck Converter (logic power) -->
-        <mxCell id="buck" value="&lt;b&gt;B560 Mini&lt;/b&gt;&lt;br&gt;Buck converter&lt;br&gt;~12V → 5V / 3.3V&lt;br&gt;питание логики" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="280" y="550" width="175" height="90" as="geometry" />
+        <mxCell id="buck" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=12;" value="&lt;b&gt;B560 Mini&lt;/b&gt;&lt;br&gt;Buck converter&lt;br&gt;~12V → 5V / 3.3V&lt;br&gt;питание логики" vertex="1">
+          <mxGeometry height="90" width="175" x="280" y="550" as="geometry" />
         </mxCell>
-
-        <!-- TMC2209 + Motor (direct 12V) -->
-        <mxCell id="mtr_load" value="&lt;b&gt;TMC2209 + NEMA17&lt;/b&gt;&lt;br&gt;питание: ~12 V напрямую&lt;br&gt;с силовой шины" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="680" y="550" width="200" height="90" as="geometry" />
+        <mxCell id="mtr_load" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=12;" value="&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;b&gt;TMC2209 + NEMA17&lt;/b&gt;&lt;br&gt;питание: ~12 V напрямую&lt;br&gt;с силовой шины&lt;/font&gt;" vertex="1">
+          <mxGeometry height="90" width="200" x="680" y="550" as="geometry" />
         </mxCell>
-
-        <!-- ── ЛОГИКА ── -->
-
-        <!-- Logic Rail (3.3V / 5V) -->
-        <mxCell id="logic_rail" value="ШИНА ЛОГИКИ  3.3 V / 5 V" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=1;strokeWidth=2;" vertex="1" parent="1">
-          <mxGeometry x="280" y="710" width="375" height="45" as="geometry" />
+        <mxCell id="logic_rail" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=13;fontStyle=1;strokeWidth=2;" value="ШИНА ЛОГИКИ  3.3 V / 5 V" vertex="1">
+          <mxGeometry height="45" width="375" x="280" y="710" as="geometry" />
         </mxCell>
-
-        <!-- MOSFET Power Switch -->
-        <mxCell id="mosfet" value="&lt;b&gt;N-MOSFET (силовой ключ)&lt;/b&gt;&lt;br&gt;разрывает GND&lt;br&gt;между силовой и цифровой частью&lt;br&gt;──────────────&lt;br&gt;D ← силовой GND&lt;br&gt;S → цифровой GND&lt;br&gt;G ← выключатель" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;verticalAlign=top;spacingTop=6;" vertex="1" parent="1">
-          <mxGeometry x="280" y="820" width="200" height="155" as="geometry" />
+        <mxCell id="mosfet" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;verticalAlign=top;spacingTop=6;" value="&lt;b&gt;N-MOSFET (силовой ключ)&lt;/b&gt;&lt;br&gt;разрывает GND&lt;br&gt;между силовой и цифровой частью&lt;br&gt;──────────────&lt;br&gt;D ← силовой GND&lt;br&gt;S → цифровой GND&lt;br&gt;G ← выключатель" vertex="1">
+          <mxGeometry height="155" width="200" x="280" y="820" as="geometry" />
         </mxCell>
-
-        <!-- Physical Switch -->
-        <mxCell id="sw" value="&lt;b&gt;Выключатель&lt;/b&gt;&lt;br&gt;(физическая кнопка)&lt;br&gt;управляет Gate MOSFET" style="shape=mxgraph.electrical.switches.spst_switch_2;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="560" y="855" width="175" height="80" as="geometry" />
+        <mxCell id="sw" parent="1" style="shape=mxgraph.electrical.switches.spst_switch_2;whiteSpace=wrap;html=1;fillColor=#fff2cc;strokeColor=#d6b656;fontSize=12;" value="&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;b&gt;Выключатель&lt;/b&gt;&lt;br&gt;(физическая кнопка)&lt;br&gt;управляет Gate MOSFET&lt;/font&gt;" vertex="1">
+          <mxGeometry height="80" width="175" x="630" y="1070" as="geometry" />
         </mxCell>
-
-        <!-- Digital GND -->
-        <mxCell id="dgnd" value="Цифровой GND&lt;br&gt;(подключается при включении)" style="text;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;align=center;fontSize=11;whiteSpace=wrap;rounded=1;" vertex="1" parent="1">
-          <mxGeometry x="310" y="1010" width="180" height="45" as="geometry" />
+        <mxCell id="dgnd" parent="1" style="text;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;align=center;fontSize=11;whiteSpace=wrap;rounded=1;" value="Цифровой GND&lt;br&gt;(подключается при включении)" vertex="1">
+          <mxGeometry height="45" width="180" x="10" y="860" as="geometry" />
         </mxCell>
-
-        <!-- Digital Components -->
-        <mxCell id="digital" value="&lt;b&gt;Цифровая часть&lt;/b&gt;&lt;br&gt;ESP32 · SSD1306 OLED · PCF8574&lt;br&gt;ADXL345 · LED Status · LED Battery" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" vertex="1" parent="1">
-          <mxGeometry x="560" y="710" width="310" height="75" as="geometry" />
+        <mxCell id="digital" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=12;" value="&lt;b&gt;Цифровая часть&lt;/b&gt;&lt;br&gt;ESP32 · SSD1306 OLED · PCF8574&lt;br&gt;ADXL345 · LED Status · LED Battery" vertex="1">
+          <mxGeometry height="75" width="310" x="540" y="770" as="geometry" />
         </mxCell>
-
-        <!-- Power GND label -->
-        <mxCell id="pgnd" value="Силовой GND (общий)" style="text;html=1;strokeColor=#b85450;fillColor=#f8cecc;align=center;fontSize=11;whiteSpace=wrap;rounded=1;" vertex="1" parent="1">
-          <mxGeometry x="680" y="660" width="200" height="35" as="geometry" />
+        <mxCell id="pgnd" parent="1" style="text;html=1;strokeColor=#b85450;fillColor=#f8cecc;align=center;fontSize=11;whiteSpace=wrap;rounded=1;" value="Силовой GND (общий)" vertex="1">
+          <mxGeometry height="35" width="200" x="680" y="660" as="geometry" />
         </mxCell>
-
-        <!-- ============================================================ -->
-        <!--                        СОЕДИНЕНИЯ                            -->
-        <!-- ============================================================ -->
-
-        <!-- PD Trigger → MT3608 -->
-        <mxCell id="pw_e1" value="12 V" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;strokeWidth=3;fontSize=11;fontStyle=1;" edge="1" source="pd" target="boost" parent="1">
+        <mxCell id="pw_e1" edge="1" parent="1" source="pd" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;strokeWidth=3;fontSize=11;fontStyle=1;" target="boost" value="12 V">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- MT3608 → junction node -->
-        <mxCell id="pw_e2" value="12.16 V" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;strokeWidth=3;fontSize=11;fontStyle=1;" edge="1" source="boost" target="junc_boost" parent="1">
+        <mxCell id="pw_e2" edge="1" parent="1" source="boost" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;strokeWidth=3;fontSize=11;fontStyle=1;" target="junc_boost" value="12.16 V">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- Junction → R+Schottky (charging branch) -->
-        <mxCell id="pw_e3" value="ветка заряда" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;strokeWidth=2;fontSize=10;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" edge="1" source="junc_boost" target="rschottky" parent="1">
+        <mxCell id="pw_e3" edge="1" parent="1" source="junc_boost" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;strokeWidth=2;fontSize=10;dashed=1;exitX=1;exitY=0.5;exitDx=0;exitDy=0;entryX=0;entryY=0.5;entryDx=0;entryDy=0;" target="rschottky" value="ветка заряда">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- R+Schottky → BMS (B+) -->
-        <mxCell id="pw_e4" value="→ B+ BMS&lt;br&gt;(заряд ячеек)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;strokeWidth=2;fontSize=10;dashed=1;" edge="1" source="rschottky" target="bms" parent="1">
+        <mxCell id="pw_e4" edge="1" parent="1" source="rschottky" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;strokeWidth=2;fontSize=10;dashed=1;" target="bms" value="→ B+ BMS&lt;br&gt;(заряд ячеек)">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- BMS → Battery cells -->
-        <mxCell id="pw_e5" value="B+ / B−" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;strokeWidth=2;fontSize=10;" edge="1" source="bms" target="cells" parent="1">
+        <mxCell id="pw_e5" edge="1" parent="1" source="bms" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;strokeWidth=2;fontSize=10;" target="cells" value="B+ / B−">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- Junction → Ideal Diode 1 (load branch) -->
-        <mxCell id="pw_e6" value="ветка нагрузки" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=2;fontSize=10;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="junc_boost" target="id1" parent="1">
+        <mxCell id="pw_e6" edge="1" parent="1" source="junc_boost" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=2;fontSize=10;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="id1" value="ветка нагрузки">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- Ideal Diode 1 → Main Rail -->
-        <mxCell id="pw_e7" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=3;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;" edge="1" source="id1" target="rail" parent="1">
+        <mxCell id="pw_e7" edge="1" parent="1" source="id1" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=3;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.2;entryY=0;entryDx=0;entryDy=0;" target="rail" value="">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- BMS (P-) → Ideal Diode 2 (discharge path) -->
-        <mxCell id="pw_e8" value="P− BMS&lt;br&gt;(разряд)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=2;fontSize=10;exitX=0;exitY=0.7;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="bms" target="id2" parent="1">
+        <mxCell id="pw_e8" edge="1" parent="1" source="bms" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=2;fontSize=10;exitX=0;exitY=0.7;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="id2" value="P− BMS&lt;br&gt;(разряд)">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- Ideal Diode 2 → Main Rail -->
-        <mxCell id="pw_e9" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=3;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;" edge="1" source="id2" target="rail" parent="1">
+        <mxCell id="pw_e9" edge="1" parent="1" source="id2" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=3;exitX=0.5;exitY=1;exitDx=0;exitDy=0;entryX=0.8;entryY=0;entryDx=0;entryDy=0;" target="rail" value="">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- Main Rail → B560 Mini -->
-        <mxCell id="pw_e10" value="~12 V" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=3;fontSize=11;fontStyle=1;" edge="1" source="rail" target="buck" parent="1">
+        <mxCell id="pw_e10" edge="1" parent="1" source="rail" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=3;fontSize=11;fontStyle=1;" target="buck" value="~12 V">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- Main Rail → TMC2209+Motor -->
-        <mxCell id="pw_e11" value="~12 V" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#666666;strokeWidth=3;fontSize=11;fontStyle=1;" edge="1" source="rail" target="mtr_load" parent="1">
+        <mxCell id="pw_e11" edge="1" parent="1" source="rail" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#666666;strokeWidth=3;fontSize=11;fontStyle=1;" target="mtr_load" value="~12 V">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- B560 Mini → Logic Rail -->
-        <mxCell id="pw_e12" value="5 V / 3.3 V" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=2;fontSize=11;fontStyle=1;" edge="1" source="buck" target="logic_rail" parent="1">
+        <mxCell id="pw_e12" edge="1" parent="1" source="buck" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=2;fontSize=11;fontStyle=1;" target="logic_rail" value="5 V / 3.3 V">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- Logic Rail → Digital Components -->
-        <mxCell id="pw_e13" value="" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=2;" edge="1" source="logic_rail" target="digital" parent="1">
+        <mxCell id="pw_e13" edge="1" parent="1" source="logic_rail" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#82b366;strokeWidth=2;" target="digital" value="">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- Logic Rail → MOSFET (via GND path) -->
-        <mxCell id="pw_e14" value="GND путь" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;strokeWidth=2;fontSize=10;dashed=1;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" edge="1" source="logic_rail" target="mosfet" parent="1">
+        <mxCell id="pw_e14" edge="1" parent="1" source="logic_rail" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;strokeWidth=2;fontSize=10;dashed=1;exitX=0;exitY=1;exitDx=0;exitDy=0;entryX=0.5;entryY=0;entryDx=0;entryDy=0;" target="mosfet" value="GND путь">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- Physical Switch → MOSFET Gate -->
-        <mxCell id="pw_e15" value="Gate (вкл/выкл)" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;strokeWidth=2;fontSize=10;" edge="1" source="sw" target="mosfet" parent="1">
+        <mxCell id="pw_e15" edge="1" parent="1" source="sw" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#d6b656;strokeWidth=2;fontSize=10;" target="mosfet" value="Gate (вкл/выкл)">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- MOSFET → Digital GND -->
-        <mxCell id="pw_e16" value="цифровой GND" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;strokeWidth=2;fontSize=10;" edge="1" source="mosfet" target="dgnd" parent="1">
+        <mxCell id="pw_e16" edge="1" parent="1" source="mosfet" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#6c8ebf;strokeWidth=2;fontSize=10;" target="dgnd" value="цифровой GND">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- MOSFET → Power GND -->
-        <mxCell id="pw_e17" value="силовой GND" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;strokeWidth=2;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" edge="1" source="mosfet" target="pgnd" parent="1">
+        <mxCell id="pw_e17" edge="1" parent="1" source="mosfet" style="edgeStyle=orthogonalEdgeStyle;html=1;strokeColor=#b85450;strokeWidth=2;fontSize=10;exitX=1;exitY=0.5;exitDx=0;exitDy=0;" target="pgnd" value="силовой GND">
           <mxGeometry relative="1" as="geometry" />
         </mxCell>
-
-        <!-- ============================================================ -->
-        <!--                       АННОТАЦИИ                              -->
-        <!-- ============================================================ -->
-
-        <!-- Annotation: OR-diode logic -->
-        <mxCell id="ann1" value="&lt;b&gt;OR-диодная логика:&lt;/b&gt;&lt;br&gt;шину питает тот источник,&lt;br&gt;у кого выше напряжение.&lt;br&gt;Идеальные диоды исключают&lt;br&gt;обратный ток." style="text;html=1;strokeColor=#82b366;fillColor=#f6ffed;align=left;fontSize=11;whiteSpace=wrap;rounded=1;" vertex="1" parent="1">
-          <mxGeometry x="1110" y="280" width="220" height="110" as="geometry" />
+        <mxCell id="ann1" parent="1" style="text;html=1;strokeColor=#82b366;fillColor=#f6ffed;align=left;fontSize=11;whiteSpace=wrap;rounded=1;" value="&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;b&gt;OR-диодная логика:&lt;/b&gt;&lt;br&gt;шину питает тот источник,&lt;br&gt;у кого выше напряжение.&lt;br&gt;Идеальные диоды исключают&lt;br&gt;обратный ток.&lt;/font&gt;" vertex="1">
+          <mxGeometry height="110" width="220" x="1130" y="285" as="geometry" />
         </mxCell>
-
-        <!-- Annotation: MOSFET switch -->
-        <mxCell id="ann2" value="&lt;b&gt;Силовой ключ (MOSFET):&lt;/b&gt;&lt;br&gt;выключатель → Gate HIGH →&lt;br&gt;MOSFET открыт → цифровой GND&lt;br&gt;подключён к силовому GND →&lt;br&gt;вся электроника работает" style="text;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;fontSize=11;whiteSpace=wrap;rounded=1;" vertex="1" parent="1">
-          <mxGeometry x="800" y="820" width="240" height="110" as="geometry" />
+        <mxCell id="ann2" parent="1" style="text;html=1;strokeColor=#6c8ebf;fillColor=#dae8fc;align=left;fontSize=11;whiteSpace=wrap;rounded=1;" value="&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;b&gt;Силовой ключ (MOSFET):&lt;/b&gt;&lt;br&gt;выключатель → Gate HIGH →&lt;br&gt;MOSFET открыт → цифровой GND&lt;br&gt;подключён к силовому GND →&lt;br&gt;вся электроника работает&lt;/font&gt;" vertex="1">
+          <mxGeometry height="110" width="240" x="940" y="975" as="geometry" />
         </mxCell>
-
-        <!-- Annotation: Charging path -->
-        <mxCell id="ann3" value="&lt;b&gt;Зарядный путь:&lt;/b&gt;&lt;br&gt;12.16V → R (огранич. тока)&lt;br&gt;→ Шоттки (защита от обрата)&lt;br&gt;→ BMS → ячейки" style="text;html=1;strokeColor=#d6b656;fillColor=#fffde7;align=left;fontSize=11;whiteSpace=wrap;rounded=1;" vertex="1" parent="1">
-          <mxGeometry x="1110" y="90" width="210" height="95" as="geometry" />
+        <mxCell id="ann3" parent="1" style="text;html=1;strokeColor=#d6b656;fillColor=#fffde7;align=left;fontSize=11;whiteSpace=wrap;rounded=1;" value="&lt;font style=&quot;color: rgb(0, 0, 0);&quot;&gt;&lt;b&gt;Зарядный путь:&lt;/b&gt;&lt;br&gt;12.16V → R (огранич. тока)&lt;br&gt;→ Шоттки (защита от обрата)&lt;br&gt;→ BMS → ячейки&lt;/font&gt;" vertex="1">
+          <mxGeometry height="95" width="210" x="1010" y="-135" as="geometry" />
         </mxCell>
-
-        <!-- LEGEND -->
-        <mxCell id="pleg_box" value="" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;" vertex="1" parent="1">
-          <mxGeometry x="40" y="430" width="195" height="295" as="geometry" />
+        <mxCell id="pleg_box" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffffff;strokeColor=#999999;" value="" vertex="1">
+          <mxGeometry height="295" width="195" x="40" y="430" as="geometry" />
         </mxCell>
-        <mxCell id="pleg_t" value="&lt;b&gt;Легенда&lt;/b&gt;" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=13;fontStyle=1;" vertex="1" parent="1">
-          <mxGeometry x="40" y="435" width="195" height="25" as="geometry" />
+        <mxCell id="pleg_t" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=center;fontSize=13;fontStyle=1;" value="&lt;b&gt;Легенда&lt;/b&gt;" vertex="1">
+          <mxGeometry height="25" width="195" x="40" y="435" as="geometry" />
         </mxCell>
-        <mxCell id="pleg1" value="Источники питания" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="55" y="465" width="165" height="28" as="geometry" />
+        <mxCell id="pleg1" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f8cecc;strokeColor=#b85450;fontSize=11;" value="Источники питания" vertex="1">
+          <mxGeometry height="28" width="165" x="55" y="465" as="geometry" />
         </mxCell>
-        <mxCell id="pleg2" value="Преобразователи" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="55" y="503" width="165" height="28" as="geometry" />
+        <mxCell id="pleg2" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#ffe6cc;strokeColor=#d6b656;fontSize=11;" value="Преобразователи" vertex="1">
+          <mxGeometry height="28" width="165" x="55" y="503" as="geometry" />
         </mxCell>
-        <mxCell id="pleg3" value="Силовая шина / I2C-логика" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="55" y="541" width="165" height="28" as="geometry" />
+        <mxCell id="pleg3" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#d5e8d4;strokeColor=#82b366;fontSize=11;" value="Силовая шина / I2C-логика" vertex="1">
+          <mxGeometry height="28" width="165" x="55" y="541" as="geometry" />
         </mxCell>
-        <mxCell id="pleg4" value="Цифровая часть (ESP32...)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="55" y="579" width="165" height="28" as="geometry" />
+        <mxCell id="pleg4" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#dae8fc;strokeColor=#6c8ebf;fontSize=11;" value="Цифровая часть (ESP32...)" vertex="1">
+          <mxGeometry height="28" width="165" x="55" y="579" as="geometry" />
         </mxCell>
-        <mxCell id="pleg5" value="Механика (мотор)" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="55" y="617" width="165" height="28" as="geometry" />
+        <mxCell id="pleg5" parent="1" style="rounded=1;whiteSpace=wrap;html=1;fillColor=#f5f5f5;strokeColor=#666666;fontSize=11;" value="Механика (мотор)" vertex="1">
+          <mxGeometry height="28" width="165" x="55" y="617" as="geometry" />
         </mxCell>
-        <mxCell id="pleg6" value="─── силовой провод (3 мм)" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="55" y="655" width="165" height="25" as="geometry" />
+        <mxCell id="pleg6" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;" value="─── силовой провод (3 мм)" vertex="1">
+          <mxGeometry height="25" width="165" x="55" y="655" as="geometry" />
         </mxCell>
-        <mxCell id="pleg7" value="- - - зарядный путь" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;" vertex="1" parent="1">
-          <mxGeometry x="55" y="680" width="165" height="25" as="geometry" />
+        <mxCell id="pleg7" parent="1" style="text;html=1;strokeColor=none;fillColor=none;align=left;fontSize=11;" value="- - - зарядный путь" vertex="1">
+          <mxGeometry height="25" width="165" x="55" y="680" as="geometry" />
         </mxCell>
-
       </root>
     </mxGraphModel>
   </diagram>
-
 </mxfile>

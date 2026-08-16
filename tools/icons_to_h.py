@@ -91,7 +91,10 @@ def main():
         lines.append(f"static const IconEntry_{size} ICONS_{size}[] = {{")
         for n in names:
             short = n.split("_", 1)[1] if "_" in n else n   # "ic32_speed" → "speed"
-            short = short[:6]                                 # max 6 chars for label
+            # Do NOT truncate: these strings are the lookup keys used by findIcon*(), and
+            # clipping them to 6 chars silently broke every name longer than that
+            # ("settings" was emitted as "settin", so findIcon32("settings") found nothing
+            # and the Settings tile simply rendered with no icon at all).
             lines.append(f'  {{ {n}, "{short}" }},')
         lines.append("};")
         lines.append(f"static const int N_{size} = {len(names)};")

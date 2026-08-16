@@ -1,12 +1,17 @@
-.PHONY: build upload monitor clean check
+.PHONY: build upload flash monitor clean check
 
+# Default: OTA upload
 all: upload
 
 build:
-	pio run
+	pio run -e usb
 
-upload: build
-	pio run -t upload
+upload:
+	pio run -e ota -t upload
+
+# USB flash — first flash on blank hardware, or recovery when OTA is unreachable.
+flash: build
+	pio run -e usb -t upload
 
 monitor:
 	pio device monitor --filter esp32_exception_decoder

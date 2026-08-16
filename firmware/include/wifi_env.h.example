@@ -1,0 +1,14 @@
+// wifi_env.h.example — copy to wifi_env.h (gitignored) and fill in your real credentials.
+// Only the FIRST entry is used by wifi.cpp (single home network).
+
+struct WifiCred { const char* ssid; const char* pass; };
+
+static const WifiCred WIFI_CREDENTIALS[] = {
+  { "YourSSID", "YourPassword" },
+};
+
+static const size_t WIFI_CREDENTIALS_COUNT = sizeof(WIFI_CREDENTIALS) / sizeof(WIFI_CREDENTIALS[0]);
+
+// Optional: uncomment to require a password for OTA pushes (recommended if your network
+// isn't fully trusted). Leave commented for no OTA auth.
+// #define OTA_PASSWORD "changeme"

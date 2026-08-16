@@ -1,0 +1,583 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>Camera Slider — UI screens</title>
+<style>
+  body { margin: 0; background: #16161a; color: #cfd4e0;
+         font: 13px/1.5 -apple-system, "Segoe UI", sans-serif; padding: 24px; }
+  h1 { font-size: 18px; margin: 0 0 4px; color: #fff; }
+  p.lede { margin: 0 0 24px; color: #8b93a7; max-width: 70ch; }
+  h2 { font-size: 13px; text-transform: uppercase; letter-spacing: .1em;
+       color: #6f7a90; margin: 28px 0 10px; }
+  .grid { display: flex; flex-wrap: wrap; gap: 18px; }
+  figure { margin: 0; }
+  figcaption { font-family: ui-monospace, monospace; font-size: 11px;
+               color: #8b93a7; margin-top: 6px; }
+  canvas { image-rendering: pixelated; display: block; background: #000; }
+</style>
+
+<h1>Camera Slider — display reference</h1>
+<p class="lede">Every screen the ST7735 160×128 panel can show, rendered with the same
+geometry, palette, glyph bitmaps and status-bar icons as
+<code>firmware/src/display.cpp</code>. Shown at 4× (640×512); the exported PNGs are 1:1.</p>
+
+<div id="out"></div>
+
+<script src="assets.js"></script>
+<script>
+// ─────────────────────────────────────────────────────────────────────────────
+// A faithful re-implementation of the drawing primitives Adafruit_GFX gives the
+// firmware, so each screen below can be a near line-for-line copy of its
+// counterpart in display.cpp. Everything works on a 160x128 RGB565 framebuffer,
+// exactly like the panel.
+// ─────────────────────────────────────────────────────────────────────────────
+const SCREEN_W = 160, SCREEN_H = 128, SCALE = 4;
+
+function css565(c) {
+  const r = ((c >> 11) & 0x1f) * 255 / 31;
+  const g = ((c >> 5) & 0x3f) * 255 / 63;
+  const b = (c & 0x1f) * 255 / 31;
+  return `rgb(${Math.round(r)},${Math.round(g)},${Math.round(b)})`;
+}
+
+class Tft {
+  constructor(ctx) { this.ctx = ctx; this.size = 1; this.fg = 0xFFFF; this.bg = null;
+                     this.cx = 0; this.cy = 0; }
+  px(x, y, c) {
+    if (x < 0 || y < 0 || x >= SCREEN_W || y >= SCREEN_H) return;
+    this.ctx.fillStyle = css565(c);
+    this.ctx.fillRect(x, y, 1, 1);
+  }
+  fillRect(x, y, w, h, c) {
+    if (w <= 0 || h <= 0) return;
+    this.ctx.fillStyle = css565(c);
+    this.ctx.fillRect(x, y, w, h);
+  }
+  fillScreen(c) { this.fillRect(0, 0, SCREEN_W, SCREEN_H, c); }
+  drawFastHLine(x, y, w, c) { this.fillRect(x, y, w, 1, c); }
+  drawFastVLine(x, y, h, c) { this.fillRect(x, y, 1, h, c); }
+  drawRect(x, y, w, h, c) {
+    this.drawFastHLine(x, y, w, c); this.drawFastHLine(x, y + h - 1, w, c);
+    this.drawFastVLine(x, y, h, c); this.drawFastVLine(x + w - 1, y, h, c);
+  }
+  // Bresenham circle, same shape Adafruit_GFX produces.
+  drawCircle(x0, y0, r, c) {
+    let f = 1 - r, ddFx = 1, ddFy = -2 * r, x = 0, y = r;
+    this.px(x0, y0 + r, c); this.px(x0, y0 - r, c);
+    this.px(x0 + r, y0, c); this.px(x0 - r, y0, c);
+    while (x < y) {
+      if (f >= 0) { y--; ddFy += 2; f += ddFy; }
+      x++; ddFx += 2; f += ddFx;
+      this.px(x0 + x, y0 + y, c); this.px(x0 - x, y0 + y, c);
+      this.px(x0 + x, y0 - y, c); this.px(x0 - x, y0 - y, c);
+      this.px(x0 + y, y0 + x, c); this.px(x0 - y, y0 + x, c);
+      this.px(x0 + y, y0 - x, c); this.px(x0 - y, y0 - x, c);
+    }
+  }
+  fillCircle(x0, y0, r, c) {
+    this.drawFastVLine(x0, y0 - r, 2 * r + 1, c);
+    let f = 1 - r, ddFx = 1, ddFy = -2 * r, x = 0, y = r;
+    while (x < y) {
+      if (f >= 0) { y--; ddFy += 2; f += ddFy; }
+      x++; ddFx += 2; f += ddFx;
+      this.drawFastVLine(x0 + x, y0 - y, 2 * y + 1, c);
+      this.drawFastVLine(x0 - x, y0 - y, 2 * y + 1, c);
+      this.drawFastVLine(x0 + y, y0 - x, 2 * x + 1, c);
+      this.drawFastVLine(x0 - y, y0 - x, 2 * x + 1, c);
+    }
+  }
+  fillTriangle(x0, y0, x1, y1, x2, y2, c) {
+    const minX = Math.min(x0, x1, x2), maxX = Math.max(x0, x1, x2);
+    const minY = Math.min(y0, y1, y2), maxY = Math.max(y0, y1, y2);
+    const sign = (ax, ay, bx, by, px, py) => (px - bx) * (ay - by) - (ax - bx) * (py - by);
+    for (let y = minY; y <= maxY; y++) {
+      for (let x = minX; x <= maxX; x++) {
+        const d1 = sign(x0, y0, x1, y1, x, y);
+        const d2 = sign(x1, y1, x2, y2, x, y);
+        const d3 = sign(x2, y2, x0, y0, x, y);
+        const neg = (d1 < 0) || (d2 < 0) || (d3 < 0);
+        const pos = (d1 > 0) || (d2 > 0) || (d3 > 0);
+        if (!(neg && pos)) this.px(x, y, c);
+      }
+    }
+  }
+  drawRGBBitmap(x, y, data, w, h) {
+    for (let j = 0; j < h; j++)
+      for (let i = 0; i < w; i++) this.px(x + i, y + j, data[j * w + i]);
+  }
+  setTextSize(s) { this.size = s; }
+  setTextColor(fg, bg) { this.fg = fg; this.bg = (bg === undefined) ? null : bg; }
+  setCursor(x, y) { this.cx = x; this.cy = y; }
+  // Classic 5x7 glyph in a 6x8 cell, scaled -- matches Adafruit_GFX drawChar().
+  print(str) {
+    for (const ch of String(str)) {
+      const code = ch.charCodeAt(0) & 0xff;
+      for (let col = 0; col < 5; col++) {
+        const bits = GFX_FONT[code * 5 + col];
+        for (let row = 0; row < 8; row++) {
+          const on = (bits >> row) & 1;
+          if (on) this.fillRect(this.cx + col * this.size, this.cy + row * this.size,
+                                this.size, this.size, this.fg);
+          else if (this.bg !== null)
+            this.fillRect(this.cx + col * this.size, this.cy + row * this.size,
+                          this.size, this.size, this.bg);
+        }
+      }
+      if (this.bg !== null)  // the blank 6th column of the cell
+        this.fillRect(this.cx + 5 * this.size, this.cy, this.size, 8 * this.size, this.bg);
+      this.cx += 6 * this.size;
+    }
+  }
+}
+
+// ── Palette: the exact RGB565 tables from display.cpp ────────────────────────
+const THEMES = {
+  dark:  { bgBase:0x0862, bgPanel:0x10C4, bgCard:0x1928, bgHighlight:0x298A,
+           cyan:0x06BF, green:0x074F, amber:0xFD04, red:0xF948, purple:0x931F, sel:0x06BF,
+           textPri:0xFFFF, textSec:0x7C97, textDim:0x3A4C, divider:0x1969 },
+  light: { bgBase:0xF7BE, bgPanel:0xE75E, bgCard:0xFFFF, bgHighlight:0xD71F,
+           cyan:0x0456, green:0x1449, amber:0xB340, red:0xC0E7, purple:0x6A19, sel:0x0456,
+           textPri:0x10A3, textSec:0x4AAE, textDim:0x8CB5, divider:0xCEBC },
+  hc:    { bgBase:0x0000, bgPanel:0x0000, bgCard:0x0000, bgHighlight:0xFFFF,
+           cyan:0x07FF, green:0x07E0, amber:0xFF40, red:0xF800, purple:0xF81F, sel:0x0000,
+           textPri:0xFFFF, textSec:0xE73C, textDim:0xAD55, divider:0x632C },
+};
+
+let P, tft;   // active palette + canvas wrapper
+
+// ── display.cpp helpers ──────────────────────────────────────────────────────
+function textOpaque(x, y, fg, s, width = 0) {
+  tft.setTextColor(fg, P.bgBase);
+  tft.setCursor(x, y);
+  tft.print(s);
+  for (let i = String(s).length; i < width; i++) tft.print(' ');
+}
+
+function drawStatusBar(st) {
+  tft.fillRect(0, 0, SCREEN_W, 12, P.bgPanel);
+  tft.drawRGBBitmap(2, 0, ICONS12[st.bleConnected ? 'bt_on' : 'bt_off'], 12, 12);
+  tft.setTextSize(1);
+  tft.setTextColor(P.textPri, P.bgPanel);
+  tft.setCursor(18, 2);
+  tft.print("Camera Slider");
+  const pct = st.batteryPercent;
+  const level = pct >= 75 ? 4 : pct >= 50 ? 3 : pct >= 25 ? 2 : pct > 0 ? 1 : 0;
+  tft.drawRGBBitmap(SCREEN_W - 14, 0, ICONS12['bat_' + level], 12, 12);
+  tft.drawFastHLine(0, 12, SCREEN_W, P.divider);
+}
+
+function drawPositionBar(x, y, w, st) {
+  const h = 10;
+  tft.setTextSize(1);
+  textOpaque(x, y + 1, st.endstop1 ? P.red : P.textSec, "E1");
+  textOpaque(x + w - 12, y + 1, st.endstop2 ? P.red : P.textSec, "E2");
+  const barX = x + 16, barW = w - 32;
+  const fillColor = st.motorRunning ? P.cyan : P.green;
+  let fillW = Math.round(barW * st.frac);
+  fillW = Math.max(0, Math.min(barW, fillW));
+  if (fillW > 0)    tft.fillRect(barX, y, fillW, h, fillColor);
+  if (fillW < barW) tft.fillRect(barX + fillW, y, barW - fillW, h, P.bgCard);
+  let tickX = Math.min(barX + fillW, barX + barW - 1);
+  tft.drawFastVLine(tickX, y, h, P.textPri);
+}
+
+function drawHints(btn1, btn2, enc) {
+  tft.fillRect(0, SCREEN_H - 12, SCREEN_W, 12, P.bgPanel);
+  tft.drawFastHLine(0, SCREEN_H - 12, SCREEN_W, P.divider);
+  tft.setTextSize(1);
+  tft.setTextColor(P.textSec, P.bgPanel);
+  let left = "";
+  if (btn1) left += "1:" + btn1;
+  if (btn2) left += (left ? "  " : "") + "2:" + btn2;
+  tft.setCursor(2, SCREEN_H - 9);
+  tft.print(left);
+  if (enc) {
+    const right = "(o)" + enc;
+    tft.setCursor(SCREEN_W - 2 - right.length * 6, SCREEN_H - 9);
+    tft.print(right);
+  }
+}
+
+function drawList(items, sel) {
+  const rowH = 18, startY = 14;
+  const visible = Math.floor((SCREEN_H - 14 - 12) / rowH);
+  let offset = 0;
+  if (sel >= visible) offset = sel - visible + 1;
+  for (let i = 0; i < visible && (offset + i) < items.length; i++) {
+    const idx = offset + i, y = startY + i * rowH, isSel = idx === sel;
+    tft.fillRect(0, y, SCREEN_W, rowH, isSel ? P.bgHighlight : P.bgBase);
+    if (isSel) tft.drawFastVLine(0, y, rowH, P.sel);
+    tft.setTextSize(1);
+    tft.setTextColor(isSel ? P.sel : P.textPri);
+    tft.setCursor(6, y + 5);
+    tft.print(items[idx].label);
+    const val = items[idx].value || "";
+    if (val) {
+      tft.setTextColor(isSel ? P.sel : P.textSec);
+      tft.setCursor(SCREEN_W - 6 - val.length * 6, y + 5);
+      tft.print(val);
+    }
+  }
+}
+
+function listHeader(title) {
+  tft.fillRect(0, 12, SCREEN_W, SCREEN_H - 24, P.bgBase);
+  tft.fillRect(0, 0, SCREEN_W, 12, P.bgPanel);
+  tft.setTextSize(1);
+  tft.setTextColor(P.textPri);
+  tft.setCursor(4, 2);
+  tft.print(title);
+  tft.drawFastHLine(0, 12, SCREEN_W, P.divider);
+}
+
+// ── Menu tile icons (GFX primitives, same as display.cpp) ────────────────────
+function iconMove(cx, cy, c) {
+  for (let t = -1; t <= 1; t++) tft.drawFastHLine(cx - 13, cy + t, 26, c);
+  tft.fillTriangle(cx - 14, cy, cx - 7, cy - 6, cx - 7, cy + 6, c);
+  tft.fillTriangle(cx + 14, cy, cx + 7, cy - 6, cx + 7, cy + 6, c);
+  tft.fillRect(cx - 3, cy - 8, 6, 16, c);
+}
+function iconTarget(cx, cy, c) {
+  tft.drawCircle(cx, cy, 10, c);
+  tft.drawCircle(cx, cy, 9, c);
+  tft.drawFastHLine(cx - 15, cy, 8, c);
+  tft.drawFastHLine(cx + 8, cy, 8, c);
+  tft.drawFastVLine(cx, cy - 15, 8, c);
+  tft.drawFastVLine(cx, cy + 8, 8, c);
+  tft.fillCircle(cx, cy, 3, c);
+}
+function iconRuler(cx, cy, c) {
+  tft.drawRect(cx - 14, cy - 8, 28, 16, c);
+  tft.drawRect(cx - 13, cy - 7, 26, 14, c);
+  for (let i = 1; i < 6; i++) {
+    const x = cx - 14 + i * 5, len = (i % 2 === 0) ? 8 : 5;
+    tft.drawFastVLine(x, cy - 7, len, c);
+  }
+}
+function iconGear(cx, cy, c, bg) {
+  for (let i = 0; i < 8; i++) {
+    const a = i * Math.PI / 4;
+    tft.fillRect(cx + Math.trunc(Math.cos(a) * 12) - 3,
+                 cy + Math.trunc(Math.sin(a) * 12) - 3, 6, 6, c);
+  }
+  tft.fillCircle(cx, cy, 10, c);
+  tft.fillCircle(cx, cy, 4, bg);
+}
+const MENU_ICONS = [iconMove, iconTarget, iconRuler, iconGear];
+
+// ── Screens ─────────────────────────────────────────────────────────────────
+const S = {
+  bleConnected: true, batteryPercent: 78, endstop1: false, endstop2: false,
+  motorRunning: false, motorDirection: false, frac: 0.22,
+  position: 1234, target: 3000, travel: 5670, center: 2835, speed: 75,
+};
+
+function base() { tft.fillScreen(P.bgBase); }
+
+const SCREENS = {
+  "main": () => {
+    base(); drawStatusBar(S); drawPositionBar(4, 18, SCREEN_W - 8, S);
+    tft.setTextSize(3); textOpaque(4, 34, P.textPri, String(S.position), 8);
+    tft.setTextSize(1); textOpaque(4, 60, P.textSec, "steps", 24);
+    textOpaque(4, 76, P.textSec, S.speed + "%", 6);
+    textOpaque(40, 76, P.green, "IDLE", 8);
+    textOpaque(96, 76, P.cyan, "  ", 2);
+    drawHints("GO/STOP", "MENU", "GOTO");
+  },
+  "main-moving": () => {
+    const st = { ...S, motorRunning: true, frac: 0.55 };
+    base(); drawStatusBar(st); drawPositionBar(4, 18, SCREEN_W - 8, st);
+    tft.setTextSize(3); textOpaque(4, 34, P.textPri, "3120", 8);
+    tft.setTextSize(1); textOpaque(4, 60, P.textSec, "steps", 24);
+    textOpaque(4, 76, P.textSec, "75%", 6);
+    textOpaque(40, 76, P.cyan, "MOVING", 8);
+    textOpaque(96, 76, P.cyan, ">>", 2);
+    drawHints("GO/STOP", "MENU", "GOTO");
+  },
+  "main-uncalibrated": () => {
+    const st = { ...S, frac: 0 };
+    base(); drawStatusBar(st); drawPositionBar(4, 18, SCREEN_W - 8, st);
+    tft.setTextSize(3); textOpaque(4, 34, P.textPri, "0*", 8);
+    tft.setTextSize(1); textOpaque(4, 60, P.textSec, "steps (not calibrated)", 24);
+    textOpaque(4, 76, P.textSec, "75%", 6);
+    textOpaque(40, 76, P.green, "IDLE", 8);
+    drawHints("GO/STOP", "MENU", "GOTO");
+  },
+  "menu": () => {
+    base(); drawStatusBar(S);
+    const labels = ["Manual Move", "Position", "Calibration", "Settings"];
+    const cellW = SCREEN_W / 2, cellH = (SCREEN_H - 24) / 2;
+    for (let i = 0; i < 4; i++) {
+      const col = i % 2, row = Math.floor(i / 2);
+      const x = col * cellW, y = 12 + row * cellH, sel = (i === 0);
+      tft.fillRect(x + 1, y + 1, cellW - 2, cellH - 2, sel ? P.bgHighlight : P.bgCard);
+      if (sel) tft.drawRect(x + 1, y + 1, cellW - 2, cellH - 2, P.sel);
+      MENU_ICONS[i](x + cellW / 2, y + 20, sel ? P.sel : P.textSec,
+                    sel ? P.bgHighlight : P.bgCard);
+      tft.setTextSize(1);
+      tft.setTextColor(sel ? P.sel : P.textPri);
+      tft.setCursor(x + (cellW - labels[i].length * 6) / 2, y + cellH - 10);
+      tft.print(labels[i]);
+    }
+    drawHints("BACK", "MAIN", "SELECT");
+  },
+  "manual-move": () => {
+    base(); drawStatusBar(S);
+    tft.setTextSize(2); textOpaque(20, 30, P.textSec, "STOPPED", 7);
+    tft.setTextSize(1); textOpaque(4, 60, P.textSec, "Speed: 75%", 12);
+    drawHints("BACK", "MAIN", "REVERSE");
+  },
+  "manual-move-running": () => {
+    const st = { ...S, motorRunning: true };
+    base(); drawStatusBar(st);
+    tft.setTextSize(2); textOpaque(20, 30, P.cyan, ">> FWD", 7);
+    tft.setTextSize(1); textOpaque(4, 60, P.textSec, "Speed: 75%", 12);
+    drawHints("BACK", "MAIN", "REVERSE");
+  },
+  "go-to-position": () => {
+    base(); drawStatusBar(S); tft.setTextSize(1);
+    textOpaque(4, 20, P.textSec, "Current: " + S.position, 18);
+    textOpaque(4, 32, P.textSec, "Target:  " + S.target, 18);
+    textOpaque(4, 44, P.textSec, "Travel:  " + S.travel, 18);
+    drawPositionBar(4, 60, SCREEN_W - 8, S);
+    drawHints("BACK", "MAIN", "GO");
+  },
+  "go-to-position-uncal": () => {
+    base(); drawStatusBar(S); tft.setTextSize(1);
+    textOpaque(10, 50, P.amber, "Not calibrated", 16);
+    drawHints("BACK", "MAIN", "");
+  },
+  "calibration": () => {
+    base(); drawStatusBar(S); tft.setTextSize(1);
+    textOpaque(10, 30, P.textPri, "Calibrated", 16);
+    textOpaque(10, 44, P.textSec, "Travel: " + S.travel, 18);
+    textOpaque(10, 56, P.textSec, "Center: " + S.center, 18);
+    drawHints("BACK", "MAIN", "START");
+  },
+  "calibration-homing": () => {
+    const st = { ...S, motorRunning: true };
+    base(); drawStatusBar(st); tft.setTextSize(1);
+    textOpaque(10, 30, P.amber, "Seeking END2...", 16);
+    textOpaque(10, 46, P.textSec, "Phase 3 / 6", 14);
+    const barW = SCREEN_W - 20, done = Math.floor(barW * 3 / 6);
+    tft.fillRect(10, 60, done, 8, P.amber);
+    tft.fillRect(10 + done, 60, barW - done, 8, P.bgCard);
+    drawHints("", "ABORT", "");
+  },
+  "settings": () => {
+    listHeader("Settings");
+    drawList([{ label: "Motion" }, { label: "Sleep" }, { label: "System" },
+              { label: "Wireless" }], 0);
+    drawHints("BACK", "MAIN", "SELECT");
+  },
+  "settings-motion": () => {
+    listHeader("Motion");
+    drawList([{ label: "Speed", value: "75%" }, { label: "Ramp", value: "200" },
+              { label: "Microsteps", value: "32" },
+              { label: "Endstop Mode", value: "Stop" },
+              { label: "Homing Speed", value: "400us" }], 0);
+    drawHints("BACK", "MAIN", "SELECT");
+  },
+  "settings-sleep": () => {
+    listHeader("Sleep");
+    drawList([{ label: "Sleep Timeout", value: "5min" },
+              { label: "ADXL Sensitivity", value: "Mid" }], 0);
+    drawHints("BACK", "MAIN", "SELECT");
+  },
+  "settings-system": () => {
+    listHeader("System");
+    drawList([{ label: "Motor Current", value: "800mA" },
+              { label: "Reset Calibration" }, { label: "Reset Error" },
+              { label: "Theme", value: "Dark" }, { label: "Brightness", value: "80%" },
+              { label: "Diagnostics" }, { label: "Motor Test" }], 0);
+    drawHints("BACK", "MAIN", "SELECT");
+  },
+  "settings-wireless": () => {
+    listHeader("Wireless");
+    drawList([{ label: "Bluetooth", value: "On" },
+              { label: "WiFi", value: "192.168.8.237" }], 0);
+    drawHints("BACK", "MAIN", "SELECT");
+  },
+  "wifi-mode": () => {
+    listHeader("WiFi");
+    drawList([{ label: "Off" }, { label: "Connect to Network" },
+              { label: "Create Hotspot" }], 1);
+    drawHints("BACK", "MAIN", "SELECT");
+  },
+  "wifi-scanning": () => {
+    listHeader("Networks");
+    textOpaque(30, 56, P.textSec, "Scanning...", 12);
+    drawHints("BACK", "MAIN", "SELECT");
+  },
+  "wifi-scan-results": () => {
+    listHeader("Networks");
+    drawList([{ label: "HomeNet", value: "-48dBm" },
+              { label: "HomeNet_5G", value: "-67dBm" },
+              { label: "GuestNet", value: "open -71dBm" },
+              { label: "Rescan" }], 0);
+    drawHints("BACK", "MAIN", "SELECT");
+  },
+  "password-entry": () => {
+    listHeader("Password");
+    tft.setTextSize(1);
+    const text = "hunter2xy";  // placeholder -- never put a real password here
+    tft.setTextColor(P.textPri, P.bgBase);
+    tft.setCursor(4, 24); tft.print(text);
+    const cursorX = 4 + text.length * 6;
+    tft.fillRect(cursorX, 22, 7, 11, P.cyan);
+    tft.setTextColor(P.bgBase, P.cyan);
+    tft.setCursor(cursorX + 1, 24); tft.print("a");
+    tft.setTextColor(P.textSec, P.bgBase);
+    tft.setCursor(4, 44); tft.print("turn=pick  press=add");
+    tft.setTextColor(P.green, P.bgBase);
+    tft.setCursor(4, 58); tft.print("BTN2 = CONNECT");
+    tft.setTextColor(P.textDim, P.bgBase);
+    tft.setCursor(4, 72); tft.print("BTN1 = delete char");
+    textOpaque(4, 86, P.textDim, text.length + " chars", 12);
+    drawHints("DEL", "CONNECT", "NEXT");
+  },
+  "wifi-connecting": () => {
+    base(); tft.setTextSize(1);
+    textOpaque(10, 30, P.textPri, "Connecting...", 18);
+    tft.setTextSize(2); textOpaque(SCREEN_W / 2 - 6, 60, P.cyan, "/", 1);
+    drawHints("", "", "");
+  },
+  "wifi-failed": () => {
+    base(); tft.setTextSize(1);
+    textOpaque(10, 30, P.red, "Failed to connect", 18);
+    tft.setTextSize(2); textOpaque(SCREEN_W / 2 - 6, 60, P.cyan, " ", 1);
+    drawHints("BACK", "BACK", "");
+  },
+  "value-edit-numeric": () => {
+    listHeader("Speed");
+    const buf = "75";
+    tft.setTextSize(3);
+    const w = buf.length * 18, x = Math.floor((SCREEN_W - w) / 2);
+    tft.setTextColor(P.cyan, P.bgBase); tft.setCursor(x, 44); tft.print(buf);
+    tft.fillRect(10, 84, SCREEN_W - 20, 6, P.bgCard);
+    tft.fillRect(10, 84, Math.round((SCREEN_W - 20) * (75 - 1) / 99), 6, P.cyan);
+    drawHints("CANCEL", "", "SAVE");
+  },
+  "value-edit-named": () => {
+    listHeader("Endstop Mode");
+    tft.setTextSize(2); textOpaque(4, 44, P.cyan, "Bounce", 13);
+    drawHints("CANCEL", "", "SAVE");
+  },
+  "homing-confirm": () => {
+    tft.fillRect(0, 0, SCREEN_W, SCREEN_H - 12, P.bgBase);
+    tft.drawRect(10, 30, SCREEN_W - 20, 50, P.amber);
+    tft.setTextSize(1);
+    tft.setTextColor(P.textPri); tft.setCursor(20, 42); tft.print("Start homing?");
+    tft.setTextColor(P.textSec);
+    tft.setCursor(20, 58); tft.print("Slider will move");
+    tft.setCursor(20, 68); tft.print("to both endstops.");
+    drawHints("CANCEL", "CANCEL", "CONFIRM");
+  },
+  "error": () => {
+    tft.fillScreen(P.bgBase);
+    tft.setTextSize(2); tft.setTextColor(P.red);
+    tft.setCursor(20, 20); tft.print("ERROR");
+    tft.setTextSize(1); tft.setTextColor(P.textPri);
+    tft.setCursor(10, 50); tft.print("BLE Lost");
+    drawHints("RESET", "RESET+HOME", "");
+  },
+  "diagnostics": () => {
+    listHeader("Diagnostics");
+    tft.setTextSize(1);
+    textOpaque(4, 16, P.textSec, "ENC SW:1  (gpio19)", 20);
+    textOpaque(4, 28, P.textSec, "BTN1:1  BTN2:1", 20);
+    textOpaque(4, 40, P.textSec, "END1:0  END2:0", 20);
+    textOpaque(4, 52, P.cyan, "ENC RAW:-14", 20);
+    textOpaque(4, 68, P.textSec, "X+0.01 Y+1.00 Z+0.04", 22);
+    textOpaque(4, 80, P.textSec, "12.34V  350mA", 22);
+    textOpaque(4, 100, P.textDim, "hold BTN1+BTN2 3s", 20);
+    drawHints("", "", "");
+  },
+  "motor-test": () => {
+    const st = { ...S, motorRunning: true };
+    listHeader("Motor Test");
+    tft.setTextSize(2); textOpaque(4, 18, P.cyan, "FWD >>", 7);
+    tft.setTextSize(1);
+    textOpaque(4, 40, P.textPri, "Speed: 75%", 14);
+    textOpaque(4, 52, P.textSec, "Pos: 1234", 16);
+    textOpaque(4, 64, P.textSec, "E1:0  E2:0", 14);
+    textOpaque(4, 76, P.textSec, "12.34V 850mA", 16);
+    textOpaque(4, 90, P.textDim, "1=back 2=fwd tap", 20);
+    textOpaque(4, 100, P.textDim, "turn=speed (o)=stop", 20);
+    textOpaque(4, 110, P.textDim, "hold 1+2 3s = exit", 20);
+    drawHints("", "", "");
+  },
+  "ota-update": () => {
+    tft.fillScreen(P.bgBase);
+    tft.setTextSize(2); tft.setTextColor(P.cyan, P.bgBase);
+    tft.setCursor(14, 22); tft.print("Updating");
+    tft.setTextSize(1); tft.setTextColor(P.textSec, P.bgBase);
+    tft.setCursor(14, 46); tft.print("Do not power off");
+    tft.drawRect(10, 66, SCREEN_W - 20, 12, P.textDim);
+    tft.fillRect(12, 68, Math.floor((SCREEN_W - 24) * 47 / 100), 8, P.cyan);
+    tft.setTextSize(2); textOpaque(60, 90, P.textPri, "47%", 4);
+  },
+};
+
+// ── Render + export ─────────────────────────────────────────────────────────
+const GROUPS = [
+  ["Operating screens", ["main", "main-moving", "main-uncalibrated", "menu",
+                          "manual-move", "manual-move-running",
+                          "go-to-position", "go-to-position-uncal",
+                          "calibration", "calibration-homing"]],
+  ["Settings", ["settings", "settings-motion", "settings-sleep", "settings-system",
+                 "settings-wireless", "value-edit-numeric", "value-edit-named"]],
+  ["Wireless", ["wifi-mode", "wifi-scanning", "wifi-scan-results", "password-entry",
+                 "wifi-connecting", "wifi-failed"]],
+  ["Dialogs, service & system", ["homing-confirm", "error", "diagnostics",
+                                  "motor-test", "ota-update"]],
+];
+
+const exported = {};
+
+function renderTo(canvas, name, themeKey) {
+  P = THEMES[themeKey];
+  const ctx = canvas.getContext('2d');
+  ctx.setTransform(1, 0, 0, 1, 0, 0);
+  ctx.clearRect(0, 0, canvas.width, canvas.height);
+  tft = new Tft(ctx);
+  SCREENS[name]();
+}
+
+function build() {
+  const out = document.getElementById('out');
+  const make = (name, themeKey, suffix) => {
+    const fig = document.createElement('figure');
+    const c = document.createElement('canvas');
+    c.width = SCREEN_W; c.height = SCREEN_H;
+    c.style.width = (SCREEN_W * SCALE) + 'px';
+    c.style.height = (SCREEN_H * SCALE) + 'px';
+    renderTo(c, name, themeKey);
+    exported[name + suffix] = c.toDataURL('image/png');
+    const cap = document.createElement('figcaption');
+    cap.textContent = name + suffix + '.png';
+    fig.append(c, cap);
+    return fig;
+  };
+
+  for (const [title, names] of GROUPS) {
+    const h = document.createElement('h2'); h.textContent = title; out.append(h);
+    const grid = document.createElement('div'); grid.className = 'grid';
+    for (const n of names) grid.append(make(n, 'dark', ''));
+    out.append(grid);
+  }
+
+  const h = document.createElement('h2');
+  h.textContent = 'Alternative themes (samples)';
+  out.append(h);
+  const grid = document.createElement('div'); grid.className = 'grid';
+  for (const n of ['main', 'menu', 'settings-system']) {
+    grid.append(make(n, 'light', '--light'));
+    grid.append(make(n, 'hc', '--high-contrast'));
+  }
+  out.append(grid);
+
+  window.__EXPORTED__ = exported;
+  document.title = 'ready:' + Object.keys(exported).length;
+}
+build();
+</script>
