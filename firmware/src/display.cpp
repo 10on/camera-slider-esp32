@@ -69,6 +69,9 @@ void displaySetTheme(uint8_t theme) {
 
 static const int SCREEN_W = 160;
 static const int SCREEN_H = 128;
+static const int HEADER_H = 13;
+static const int FOOTER_H = 15;
+static const int CONTENT_BOTTOM = SCREEN_H - FOOTER_H;
 
 // Clearing the content area and then drawing on top of it is what makes this display
 // visibly flash on every update -- on a direct-to-SPI ST7735 there's no back buffer, so
@@ -81,10 +84,10 @@ static const int SCREEN_H = 128;
 static bool fullRepaint = true;
 
 static void clearContentBand() {
-  if (fullRepaint) tft.fillRect(0, 12, SCREEN_W, SCREEN_H - 24, BG_BASE);
+  if (fullRepaint) tft.fillRect(0, HEADER_H, SCREEN_W, CONTENT_BOTTOM - HEADER_H, BG_BASE);
 }
 static void clearFullBand() {  // screens with no status bar
-  if (fullRepaint) tft.fillRect(0, 0, SCREEN_W, SCREEN_H - 12, BG_BASE);
+  if (fullRepaint) tft.fillRect(0, 0, SCREEN_W, CONTENT_BOTTOM, BG_BASE);
 }
 
 // Opaque, fixed-width text: pads to `width` chars so shrinking values self-erase.
@@ -93,6 +96,32 @@ static void textOpaque(int x, int y, uint16_t fg, const char* s, int width = 0) 
   tft.setCursor(x, y);
   tft.print(s);
   for (int i = (int)strlen(s); i < width; i++) tft.print(' ');
+}
+
+static void formatSteps(int32_t value, char* out, size_t outSize) {
+  char raw[16];
+  snprintf(raw, sizeof(raw), "%ld", (long)value);
+  int len = strlen(raw);
+  bool negative = raw[0] == '-';
+  int digits = len - (negative ? 1 : 0);
+  int spaces = digits > 0 ? (digits - 1) / 3 : 0;
+  if ((size_t)(len + spaces + 1) > outSize) {
+    snprintf(out, outSize, "%s", raw);
+    return;
+  }
+  int src = len - 1;
+  int dst = len + spaces;
+  out[dst--] = '\0';
+  int group = 0;
+  while (src >= (negative ? 1 : 0)) {
+    if (group == 3) {
+      out[dst--] = ' ';
+      group = 0;
+    }
+    out[dst--] = raw[src--];
+    group++;
+  }
+  if (negative) out[0] = '-';
 }
 
 // ── Icon lookup helpers (linear search over the generated tables; small N, fine at 10Hz) ──
@@ -122,9 +151,9 @@ static uint16_t stateColor() {
   }
 }
 
-// ── Status bar (top 12px): BT icon, title, battery ──
+// ── Status bar (top 13px): BT icon, title, battery ──
 static void drawStatusBar() {
-  if (fullRepaint) tft.fillRect(0, 0, SCREEN_W, 12, BG_PANEL);
+  if (fullRepaint) tft.fillRect(0, 0, SCREEN_W, HEADER_H, BG_PANEL);
 
   const uint16_t* bt = findIcon12(bleConnected ? "bt_on" : "bt_off");
   drawIcon(2, 0, bt, 12);
@@ -132,7 +161,7 @@ static void drawStatusBar() {
   tft.setTextSize(1);
   tft.setTextColor(TEXT_PRI, BG_PANEL);
   tft.setCursor(18, 2);
-  tft.print("Camera Slider");
+  tft.print("CAMERA SLIDER");
 
   int pct = batteryPercent();
   int level = (pct >= 75) ? 4 : (pct >= 50) ? 3 : (pct >= 25) ? 2 : (pct > 0) ? 1 : 0;
@@ -140,7 +169,18 @@ static void drawStatusBar() {
   snprintf(batName, sizeof(batName), "bat_%d", level);
   drawIcon(SCREEN_W - 14, 0, findIcon12(batName), 12);
 
-  tft.drawFastHLine(0, 12, SCREEN_W, DIVIDER);
+  tft.drawFastHLine(0, HEADER_H - 1, SCREEN_W, DIVIDER);
+}
+
+static void drawScreenHeader(const char* title, uint16_t color = 0) {
+  if (!fullRepaint) return;
+  if (color == 0) color = TEXT_PRI;
+  tft.fillRect(0, 0, SCREEN_W, HEADER_H, BG_PANEL);
+  tft.setTextSize(1);
+  tft.setTextColor(color, BG_PANEL);
+  tft.setCursor(4, 2);
+  tft.print(title);
+  tft.drawFastHLine(0, HEADER_H - 1, SCREEN_W, DIVIDER);
 }
 
 // ── Position progress bar with lerp animation ──
@@ -182,34 +222,57 @@ static void drawPositionBar(int x, int y, int w) {
 }
 
 // ── Button hint footer ──
-// Physical layout (confirmed on the actual enclosure): BTN1 and BTN2 are both mounted on
-// the LEFT flank of the case, the encoder (rotate+press) is on the RIGHT flank. So the
-// footer groups both button hints together on the left, tagged with their silkscreen
-// numbers ("1:"/"2:", matching the physical "1"/"2" printed next to the keys), and the
-// encoder hint alone on the right behind a small dial glyph -- not left/mid/right
-// text slots, which used to silently imply BTN1-left/encoder-center/BTN2-right (wrong).
-static void drawHints(const char* btn1, const char* btn2, const char* enc) {
+// Physical layout: BTN1 and BTN2 are stacked on the left flank and the encoder is on the
+// right. The footer mirrors that arrangement with the real play/menu glyphs rather than
+// abstract numeric labels, while the encoder action stays right-aligned.
+static void drawButtonGlyph(int x, int y, bool primary, uint16_t color) {
+  if (primary) {
+    tft.fillTriangle(x, y, x, y + 7, x + 5, y + 3, color);
+  } else {
+    tft.drawFastHLine(x, y + 1, 6, color);
+    tft.drawFastHLine(x, y + 3, 6, color);
+    tft.drawFastHLine(x, y + 5, 6, color);
+  }
+}
+
+static void drawHints(const char* btn1, const char* btn2, const char* enc,
+                      bool btn1Dim = false, bool btn2Dim = false,
+                      uint16_t footerBg = 0xFFFF) {
   // Hint text only ever changes when the screen changes, so on a same-screen content
   // update there is nothing to redraw here at all -- skipping it entirely keeps the
   // footer rock steady instead of repainting it 10x/second.
   if (!fullRepaint) return;
-  tft.fillRect(0, SCREEN_H - 12, SCREEN_W, 12, BG_PANEL);
-  tft.drawFastHLine(0, SCREEN_H - 12, SCREEN_W, DIVIDER);
+  uint16_t bg = footerBg == 0xFFFF ? BG_PANEL : footerBg;
+  tft.fillRect(0, CONTENT_BOTTOM, SCREEN_W, FOOTER_H, bg);
+  tft.drawFastHLine(0, CONTENT_BOTTOM, SCREEN_W, DIVIDER);
   tft.setTextSize(1);
-  tft.setTextColor(TEXT_SEC, BG_PANEL);
-
-  char left[32];
-  left[0] = '\0';
-  if (btn1 && btn1[0]) { strcat(left, "1:"); strcat(left, btn1); }
-  if (btn2 && btn2[0]) { if (left[0]) strcat(left, "  "); strcat(left, "2:"); strcat(left, btn2); }
-  tft.setCursor(2, SCREEN_H - 9);
-  tft.print(left);
+  int x = 3;
+  const int glyphY = CONTENT_BOTTOM + 4;
+  const int textY = CONTENT_BOTTOM + 4;
+  if (btn1) {
+    uint16_t c = btn1Dim ? TEXT_DIM : TEXT_SEC;
+    drawButtonGlyph(x, glyphY, true, c);
+    x += 8;
+    tft.setTextColor(c, bg);
+    tft.setCursor(x, textY);
+    tft.print(btn1);
+    x += strlen(btn1) * 6 + 5;
+  }
+  if (btn2) {
+    uint16_t c = btn2Dim ? TEXT_DIM : TEXT_SEC;
+    drawButtonGlyph(x, glyphY, false, c);
+    x += 8;
+    tft.setTextColor(c, bg);
+    tft.setCursor(x, textY);
+    tft.print(btn2);
+  }
 
   if (enc && enc[0]) {
     char right[24];
     snprintf(right, sizeof(right), "(o)%s", enc);
     int rightW = strlen(right) * 6;
-    tft.setCursor(SCREEN_W - 2 - rightW, SCREEN_H - 9);
+    tft.setTextColor(COL_CYAN, bg);
+    tft.setCursor(SCREEN_W - 3 - rightW, textY);
     tft.print(right);
   }
 }
@@ -217,9 +280,9 @@ static void drawHints(const char* btn1, const char* btn2, const char* enc) {
 // ── Generic vertical list (Menu tiles fallback list, Settings/Motion/Sleep/System) ──
 static void drawList(MenuScreen screen) {
   int count = menuItemCount(screen);
-  const int rowH = 18;
-  const int startY = 14;
-  int visible = (SCREEN_H - 14 - 12) / rowH;
+  const int rowH = 20;
+  const int startY = HEADER_H;
+  int visible = (CONTENT_BOTTOM - startY) / rowH;
 
   if (menuIndex < menuOffset) menuOffset = menuIndex;
   if (menuIndex >= menuOffset + visible) menuOffset = menuIndex - visible + 1;
@@ -229,11 +292,12 @@ static void drawList(MenuScreen screen) {
     int y = startY + i * rowH;
     bool sel = (idx == menuIndex);
     tft.fillRect(0, y, SCREEN_W, rowH, sel ? BG_HIGHLIGHT : BG_BASE);
-    if (sel) tft.drawFastVLine(0, y, rowH, COL_SEL);
+    if (i > 0) tft.drawFastHLine(0, y, SCREEN_W, DIVIDER);
+    if (sel) tft.fillRect(0, y, 2, rowH, COL_SEL);
 
     tft.setTextSize(1);
     tft.setTextColor(sel ? COL_SEL : TEXT_PRI);
-    tft.setCursor(6, y + 5);
+    tft.setCursor(8, y + 6);
     tft.print(menuItemLabel(screen, idx));
 
     char valBuf[24];
@@ -241,7 +305,7 @@ static void drawList(MenuScreen screen) {
     if (valBuf[0]) {
       int vw = strlen(valBuf) * 6;
       tft.setTextColor(sel ? COL_SEL : TEXT_SEC);
-      tft.setCursor(SCREEN_W - 6 - vw, y + 5);
+      tft.setCursor(SCREEN_W - 6 - vw, y + 6);
       tft.print(valBuf);
     }
   }
@@ -253,120 +317,101 @@ static void renderMain() {
   drawStatusBar();
   drawPositionBar(4, 18, SCREEN_W - 8);
 
-  char buf[16];
-  snprintf(buf, sizeof(buf), isCalibrated ? "%ld" : "%ld*", (long)currentPosition);
+  char value[20], buf[28];
+  formatSteps(currentPosition, value, sizeof(value));
+  if (!isCalibrated) strncat(value, "*", sizeof(value) - strlen(value) - 1);
   tft.setTextSize(3);
-  textOpaque(4, 34, TEXT_PRI, buf, 8);
+  int valueW = strlen(value) * 18;
+  int valueX = (SCREEN_W - valueW) / 2;
+  if (valueX < 2) valueX = 2;
+  tft.fillRect(0, 34, SCREEN_W, 24, BG_BASE);
+  textOpaque(valueX, 34, TEXT_PRI, value);
 
   tft.setTextSize(1);
-  textOpaque(4, 60, TEXT_SEC, isCalibrated ? "steps" : "steps (not calibrated)", 24);
+  if (isCalibrated) {
+    formatSteps(travelDistance, value, sizeof(value));
+    snprintf(buf, sizeof(buf), "/ %s TOTAL STEPS", value);
+  } else {
+    snprintf(buf, sizeof(buf), "POSITION NOT CALIBRATED");
+  }
+  int labelW = strlen(buf) * 6;
+  textOpaque((SCREEN_W - labelW) / 2, 60, TEXT_SEC, buf);
 
   snprintf(buf, sizeof(buf), "%u%%", cfg.speed);
-  textOpaque(4, 76, TEXT_SEC, buf, 6);
-  textOpaque(40, 76, stateColor(), stateToString(sliderState), 8);
-  textOpaque(96, 76, COL_CYAN, motorRunning ? (motorDirection ? "<<" : ">>") : "  ", 2);
+  textOpaque(4, 77, TEXT_PRI, buf, 4);
+  const int speedBarW = SCREEN_W - 58;
+  int speedW = speedBarW * cfg.speed / 100;
+  tft.fillRect(32, 79, speedBarW, 5, BG_CARD);
+  if (speedW > 0) tft.fillRect(32, 79, speedW, 5, COL_CYAN);
+  textOpaque(4, 94, stateColor(), stateToString(sliderState), 9);
+  textOpaque(104, 94, COL_CYAN, motorRunning ? (motorDirection ? "<<<" : ">>>") : "   ", 3);
 
   drawHints("GO/STOP", "MENU", "GOTO");
 }
 
 // ── MENU (2x2 tiles) ──
-//
-// Menu icons are drawn with GFX primitives rather than pulled from the generated 32x32
-// RGB565 bitmap set. Two reasons, both practical: the rendered artwork turned to mush at
-// 32px on this panel (only the speedometer stayed legible), and a fixed-color bitmap
-// can't follow the theme or the selection highlight. Line art at this size is also far
-// cheaper -- dropping the 32px table frees the ~28KB of flash those bitmaps occupied.
-// Each helper draws centred on (cx, cy) in a single colour.
-
-static void iconMove(int cx, int cy, uint16_t c, uint16_t bg) {
-  (void)bg;
-  // Double-headed horizontal arrow with a carriage block: "move along the rail".
-  for (int t = -1; t <= 1; t++) tft.drawFastHLine(cx - 13, cy + t, 26, c);
-  tft.fillTriangle(cx - 14, cy, cx - 7, cy - 6, cx - 7, cy + 6, c);
-  tft.fillTriangle(cx + 14, cy, cx + 7, cy - 6, cx + 7, cy + 6, c);
-  tft.fillRect(cx - 3, cy - 8, 6, 16, c);
-}
-
-static void iconTarget(int cx, int cy, uint16_t c, uint16_t bg) {
-  (void)bg;
-  // Crosshair over a centre dot: "go to a specific position".
-  tft.drawCircle(cx, cy, 10, c);
-  tft.drawCircle(cx, cy, 9, c);
-  tft.drawFastHLine(cx - 15, cy, 8, c);
-  tft.drawFastHLine(cx + 8,  cy, 8, c);
-  tft.drawFastVLine(cx, cy - 15, 8, c);
-  tft.drawFastVLine(cx, cy + 8,  8, c);
-  tft.fillCircle(cx, cy, 3, c);
-}
-
-static void iconRuler(int cx, int cy, uint16_t c, uint16_t bg) {
-  (void)bg;
-  // Ruler with graduations: "measure the travel" (calibration/homing).
-  tft.drawRect(cx - 14, cy - 8, 28, 16, c);
-  tft.drawRect(cx - 13, cy - 7, 26, 14, c);
-  for (int i = 1; i < 6; i++) {
-    int x = cx - 14 + i * 5;
-    int len = (i % 2 == 0) ? 8 : 5;   // alternating long/short ticks
-    tft.drawFastVLine(x, cy - 7, len, c);
-  }
-}
-
-static void iconGear(int cx, int cy, uint16_t c, uint16_t bg) {
-  // Eight-tooth gear: settings. The hub is punched out in the tile's own background so it
-  // reads as a hole on both the normal and the highlighted tile.
-  for (int i = 0; i < 8; i++) {
-    float a = i * (float)PI / 4.0f;
-    int tx = cx + (int)(cosf(a) * 12.0f);
-    int ty = cy + (int)(sinf(a) * 12.0f);
-    tft.fillRect(tx - 3, ty - 3, 6, 6, c);
-  }
-  tft.fillCircle(cx, cy, 10, c);
-  tft.fillCircle(cx, cy, 4, bg);
-}
-
-typedef void (*MenuIconFn)(int, int, uint16_t, uint16_t);
-static const MenuIconFn MENU_ICON_FNS[4] = { iconMove, iconTarget, iconRuler, iconGear };
-
 static void renderMenu() {
   clearContentBand();
-  drawStatusBar();
+  drawScreenHeader("MENU", COL_PURPLE);
 
   int count = menuItemCount(SCREEN_MENU);
-  const int cellW = SCREEN_W / 2, cellH = (SCREEN_H - 12 - 12) / 2;
+  const int cellW = SCREEN_W / 2, cellH = (CONTENT_BOTTOM - HEADER_H) / 2;
+  static const char* badges[] = { "MOV", "POS", "CAL", "SET" };
   for (int i = 0; i < count && i < 4; i++) {
     int col = i % 2, row = i / 2;
-    int x = col * cellW, y = 12 + row * cellH;
+    int x = col * cellW, y = HEADER_H + row * cellH;
     bool sel = (i == menuIndex);
-    tft.fillRect(x + 1, y + 1, cellW - 2, cellH - 2, sel ? BG_HIGHLIGHT : BG_CARD);
-    if (sel) tft.drawRect(x + 1, y + 1, cellW - 2, cellH - 2, COL_SEL);
+    uint16_t tileBg = sel ? BG_HIGHLIGHT : BG_BASE;
+    tft.fillRect(x, y, cellW, cellH, tileBg);
+    tft.drawRect(x, y, cellW, cellH, DIVIDER);
+    if (sel) {
+      tft.drawRect(x + 1, y + 1, cellW - 2, cellH - 2, COL_SEL);
+      tft.drawRect(x + 2, y + 2, cellW - 4, cellH - 4, COL_SEL);
+    }
 
-    MENU_ICON_FNS[i](x + cellW / 2, y + 20, sel ? COL_SEL : TEXT_SEC,
-                     sel ? BG_HIGHLIGHT : BG_CARD);
+    uint16_t iconColor = i == 2 ? COL_AMBER : (i == 3 ? COL_PURPLE : (sel ? COL_SEL : TEXT_SEC));
+    tft.fillRect(x + 29, y + 7, 22, 17, BG_CARD);
+    tft.setTextSize(1);
+    tft.setTextColor(iconColor, BG_CARD);
+    tft.setCursor(x + 31, y + 12);
+    tft.print(badges[i]);
 
     tft.setTextSize(1);
-    tft.setTextColor(sel ? COL_SEL : TEXT_PRI);
+    tft.setTextColor(sel ? TEXT_PRI : TEXT_SEC, tileBg);
     const char* label = menuItemLabel(SCREEN_MENU, i);
     int lw = strlen(label) * 6;
-    tft.setCursor(x + (cellW - lw) / 2, y + cellH - 10);
+    tft.setCursor(x + (cellW - lw) / 2, y + cellH - 13);
     tft.print(label);
   }
 
-  drawHints("BACK", "MAIN", "SELECT");
+  drawHints("", "BACK", "OPEN");
 }
 
 // ── MANUAL_MOVE ──
 static void renderManualMove() {
   clearContentBand();
-  drawStatusBar();
+  drawScreenHeader("MANUAL MOVE");
 
-  tft.setTextSize(2);
-  textOpaque(20, 30, motorRunning ? COL_CYAN : TEXT_SEC,
-             motorRunning ? (motorDirection ? "<< REV" : ">> FWD") : "STOPPED", 7);
+  uint16_t arrowColor = motorRunning ? COL_CYAN : TEXT_SEC;
+  bool backward = motorDirection;
+  tft.fillRect(62, 34, 48, 15, BG_BASE);
+  for (int i = 0; i < 3; i++) {
+    int cx = 66 + i * 14;
+    if (backward) tft.fillTriangle(cx + 8, 35, cx + 8, 47, cx, 41, arrowColor);
+    else          tft.fillTriangle(cx, 35, cx, 47, cx + 8, 41, arrowColor);
+  }
 
-  char buf[16];
-  snprintf(buf, sizeof(buf), "Speed: %u%%", cfg.speed);
+  const char* direction = motorRunning ? (backward ? "REVERSE" : "FORWARD") : "STOPPED";
+  int dirW = strlen(direction) * 6;
   tft.setTextSize(1);
-  textOpaque(4, 60, TEXT_SEC, buf, 12);
+  textOpaque((SCREEN_W - dirW) / 2, 56, TEXT_SEC, direction);
+
+  char buf[8];
+  snprintf(buf, sizeof(buf), "%u%%", cfg.speed);
+  textOpaque(34, 77, TEXT_PRI, buf, 4);
+  int fillW = 72 * cfg.speed / 100;
+  tft.fillRect(58, 79, 72, 5, BG_CARD);
+  if (fillW > 0) tft.fillRect(58, 79, fillW, 5, COL_CYAN);
 
   drawHints("BACK", "MAIN", "REVERSE");
 }
@@ -374,24 +419,37 @@ static void renderManualMove() {
 // ── GO_TO_POS ──
 static void renderGoToPos() {
   clearContentBand();
-  drawStatusBar();
+  drawScreenHeader("GO TO POSITION");
   tft.setTextSize(1);
 
-  if (!isCalibrated) {
-    textOpaque(10, 50, COL_AMBER, "Not calibrated", 16);
+  if (!isCalibrated || travelDistance <= 0) {
+    textOpaque(34, 49, COL_AMBER, "NOT CALIBRATED", 15);
     drawHints("BACK", "MAIN", "");
     return;
   }
 
-  char buf[24];
-  snprintf(buf, sizeof(buf), "Current: %ld", (long)currentPosition);
-  textOpaque(4, 20, TEXT_SEC, buf, 18);
-  snprintf(buf, sizeof(buf), "Target:  %ld", (long)cmdTargetPos);
-  textOpaque(4, 32, TEXT_SEC, buf, 18);
-  snprintf(buf, sizeof(buf), "Travel:  %ld", (long)travelDistance);
-  textOpaque(4, 44, TEXT_SEC, buf, 18);
+  const int barX = 24, barY = 29, barW = 112;
+  float currentFrac = (float)currentPosition / (float)travelDistance;
+  float targetFrac = (float)cmdTargetPos / (float)travelDistance;
+  currentFrac = constrain(currentFrac, 0.0f, 1.0f);
+  targetFrac = constrain(targetFrac, 0.0f, 1.0f);
+  textOpaque(4, 28, TEXT_SEC, "E1");
+  textOpaque(142, 28, TEXT_SEC, "E2");
+  tft.fillRect(barX, barY, barW, 8, BG_CARD);
+  int currentX = barX + (int)(barW * currentFrac);
+  int targetX = barX + (int)(barW * targetFrac);
+  tft.fillRect(barX, barY, currentX - barX, 8, COL_GREEN);
+  tft.drawFastVLine(currentX, barY - 1, 10, TEXT_PRI);
+  for (int y = barY - 2; y < barY + 10; y += 3) tft.drawFastVLine(targetX, y, 2, COL_PURPLE);
 
-  drawPositionBar(4, 60, SCREEN_W - 8);
+  char value[20];
+  formatSteps(cmdTargetPos, value, sizeof(value));
+  tft.setTextSize(3);
+  int valueW = strlen(value) * 18;
+  tft.fillRect(0, 49, SCREEN_W, 24, BG_BASE);
+  textOpaque((SCREEN_W - valueW) / 2, 49, COL_PURPLE, value);
+  tft.setTextSize(1);
+  textOpaque(46, 79, TEXT_SEC, "TARGET STEPS");
 
   drawHints("BACK", "MAIN", "GO");
 }
@@ -422,74 +480,80 @@ static int homingPhaseIndex() {
 
 static void renderCalibration() {
   clearContentBand();
-  drawStatusBar();
 
   tft.setTextSize(1);
-  char buf[24];
+  char buf[28], value[20];
 
   if (sliderState == STATE_HOMING) {
-    // Phase names differ in length ("Seeking END1..." vs "Done"), so pad -- otherwise the
-    // tail of the previous, longer phase name stays on screen.
-    textOpaque(10, 30, COL_AMBER, homingPhaseText(), 16);
+    drawScreenHeader("HOMING", COL_AMBER);
+    const char* phaseText = homingPhaseText();
+    int phaseTextW = strlen(phaseText) * 6;
+    tft.fillRect(0, 26, SCREEN_W, 12, BG_BASE);
+    textOpaque((SCREEN_W - phaseTextW) / 2, 27, TEXT_PRI, phaseText);
 
     int phase = homingPhaseIndex();
     snprintf(buf, sizeof(buf), "Phase %d / 6", phase);
-    textOpaque(10, 46, TEXT_SEC, buf, 14);
+    int phaseW = strlen(buf) * 6;
+    textOpaque((SCREEN_W - phaseW) / 2, 62, TEXT_SEC, buf, 11);
 
-    int barW = SCREEN_W - 20, barX = 10, barY = 60;
-    int done = barW * phase / 6;
-    if (done > 0)     tft.fillRect(barX, barY, done, 8, COL_AMBER);
-    if (done < barW)  tft.fillRect(barX + done, barY, barW - done, 8, BG_CARD);
-
-    drawHints("", "ABORT", "");
-  } else {
-    if (isCalibrated) {
-      textOpaque(10, 30, TEXT_PRI, "Calibrated", 16);
-      snprintf(buf, sizeof(buf), "Travel: %ld", (long)travelDistance);
-      textOpaque(10, 44, TEXT_SEC, buf, 18);
-      snprintf(buf, sizeof(buf), "Center: %ld", (long)centerPosition);
-      textOpaque(10, 56, TEXT_SEC, buf, 18);
-    } else {
-      textOpaque(10, 30, TEXT_PRI, "Not calibrated", 16);
-      textOpaque(10, 44, TEXT_SEC, "", 18);
-      textOpaque(10, 56, TEXT_SEC, "", 18);
+    const int dotY = 48;
+    for (int i = 0; i < 6; i++) {
+      uint16_t c = i < phase ? COL_AMBER : TEXT_DIM;
+      tft.fillCircle(52 + i * 11, dotY, 3, c);
     }
-    drawHints("BACK", "MAIN", "START");
+    bool backward = homingPhase == HOME_SEEK_END1 || homingPhase == HOME_BACKOFF2;
+    tft.fillRect(43, 80, 78, 13, BG_BASE);
+    for (int i = 0; i < 5; i++) {
+      int cx = 47 + i * 14;
+      if (backward) tft.fillTriangle(cx + 8, 81, cx + 8, 91, cx, 86, COL_AMBER);
+      else          tft.fillTriangle(cx, 81, cx, 91, cx + 8, 86, COL_AMBER);
+    }
+
+    drawHints("", "ABORT", "", true, false);
+  } else {
+    drawScreenHeader("CALIBRATION", COL_AMBER);
+    if (isCalibrated) {
+      formatSteps(travelDistance, value, sizeof(value));
+      snprintf(buf, sizeof(buf), "Travel: %s steps", value);
+      textOpaque(22, 38, TEXT_SEC, buf, 22);
+      formatSteps(centerPosition, value, sizeof(value));
+      snprintf(buf, sizeof(buf), "Center: %s steps", value);
+      textOpaque(22, 55, TEXT_SEC, buf, 22);
+      textOpaque(43, 78, COL_GREEN, "+ CALIBRATED", 12);
+    } else {
+      textOpaque(34, 49, COL_AMBER, "NOT CALIBRATED", 15);
+    }
+    drawHints("BACK", "MAIN", isCalibrated ? "RE-HOME" : "START");
   }
 }
 
 // ── Settings-family lists (Menu-level Settings, and the 3 sub-lists) ──
 static void renderSettingsList(MenuScreen screen, const char* title) {
   clearContentBand();
-  tft.fillRect(0, 0, SCREEN_W, 12, BG_PANEL);
-  tft.setTextSize(1);
-  tft.setTextColor(TEXT_PRI);
-  tft.setCursor(4, 2);
-  tft.print(title);
-  tft.drawFastHLine(0, 12, SCREEN_W, DIVIDER);
+  char header[24];
+  snprintf(header, sizeof(header), "< %s", title);
+  drawScreenHeader(header);
 
   drawList(screen);
-  drawHints("BACK", "MAIN", "SELECT");
+  drawHints("BACK", "MAIN", "OPEN");
 }
 
 // ── VALUE_EDIT ──
 static void renderValueEdit() {
   clearContentBand();
-  tft.fillRect(0, 0, SCREEN_W, 12, BG_PANEL);
-  tft.setTextSize(1);
-  tft.setTextColor(TEXT_PRI);
-  tft.setCursor(4, 2);
-  tft.print(editLabel ? editLabel : "");
-  tft.drawFastHLine(0, 12, SCREEN_W, DIVIDER);
+  drawScreenHeader(editLabel ? editLabel : "", COL_CYAN);
 
   char buf[16];
   if (editValueNames) {
-    // Size 2, not 3: the longest name in use ("High Contrast", 13 chars) is 156px at size
-    // 2 and 234px at size 3 -- at size 3 it simply ran off the 160px-wide panel.
-    // Padded to the full row width so a shorter name can't leave the tail of a longer one
-    // behind (this is what produced "Onf" when On replaced Off).
     tft.setTextSize(2);
-    textOpaque(4, 44, COL_CYAN, editValueNames[editValue], 13);
+    const char* name = editValueNames[editValue];
+    int nameW = strlen(name) * 12;
+    int x = (SCREEN_W - nameW) / 2;
+    if (x < 2) x = 2;
+    if (!fullRepaint) tft.fillRect(0, 38, SCREEN_W, 28, BG_BASE);
+    textOpaque(x, 43, COL_CYAN, name);
+    tft.setTextSize(1);
+    textOpaque(52, 76, TEXT_SEC, "SELECT VALUE");
   } else {
     snprintf(buf, sizeof(buf), "%ld", (long)editValue);
     tft.setTextSize(3);
@@ -498,67 +562,83 @@ static void renderValueEdit() {
     if (x < 0) x = 0;
     // Centred text shifts as the number's width changes, so clear only the margins either
     // side of it -- every pixel still gets written exactly once, no full-row blanking.
-    if (x > 0) tft.fillRect(0, 44, x, 24, BG_BASE);
+    if (x > 0) tft.fillRect(0, 37, x, 24, BG_BASE);
     tft.setTextColor(COL_CYAN, BG_BASE);
-    tft.setCursor(x, 44);
+    tft.setCursor(x, 37);
     tft.print(buf);
     int right = x + w;
-    if (right < SCREEN_W) tft.fillRect(right, 44, SCREEN_W - right, 24, BG_BASE);
+    if (right < SCREEN_W) tft.fillRect(right, 37, SCREEN_W - right, 24, BG_BASE);
+
+    tft.setTextSize(1);
+    textOpaque(4, 72, TEXT_DIM, "MIN");
+    snprintf(buf, sizeof(buf), "%ld", (long)editMin);
+    textOpaque(4, 82, TEXT_SEC, buf, 8);
+    textOpaque(138, 72, TEXT_DIM, "MAX");
+    snprintf(buf, sizeof(buf), "%ld", (long)editMax);
+    int maxW = strlen(buf) * 6;
+    textOpaque(SCREEN_W - 4 - maxW, 82, TEXT_SEC, buf);
   }
 
   if (!editValueNames) {
-    int barX = 10, barY = 84, barW = SCREEN_W - 20;
+    int barX = 24, barY = 96, barW = SCREEN_W - 48;
     tft.fillRect(barX, barY, barW, 6, BG_CARD);
     float frac = (editMax > editMin) ? (float)(editValue - editMin) / (float)(editMax - editMin) : 0;
     tft.fillRect(barX, barY, (int)(barW * frac), 6, COL_CYAN);
   }
 
-  drawHints("CANCEL", "", "SAVE");
+  drawHints("CANCEL", "", "SAVE", false, true);
 }
 
 // ── ERROR ──
 static void renderError() {
-  bool pulse = (millis() / 400) % 2 == 0;
-  tft.fillScreen(pulse ? BG_BASE : 0x2000);
-  tft.setTextSize(2);
-  tft.setTextColor(COL_RED);
-  tft.setCursor(20, 20);
-  tft.print("ERROR");
+  bool pulse = (millis() / 200) % 2 == 0;
+  static int8_t lastPulse = -1;
+  if (!fullRepaint && lastPulse == (int8_t)pulse) return;
+  lastPulse = pulse;
+  uint16_t errorBg = pulse ? 0x1802 : 0x1001;
+  tft.fillRect(0, HEADER_H, SCREEN_W, CONTENT_BOTTOM - HEADER_H, errorBg);
+  if (fullRepaint) {
+    tft.fillRect(0, 0, SCREEN_W, HEADER_H, 0x2802);
+    tft.setTextSize(1);
+    tft.setTextColor(COL_RED, 0x2802);
+    tft.setCursor(4, 2);
+    tft.print("! SYSTEM ERROR");
+  }
 
   tft.setTextSize(1);
-  tft.setTextColor(TEXT_PRI);
-  tft.setCursor(10, 50);
+  tft.setTextColor(TEXT_PRI, errorBg);
+  tft.setCursor(12, 35);
   tft.print(errorToString(errorCode));
+  tft.setTextColor(0xC18F, errorBg);
+  tft.setCursor(12, 62);
+  tft.print("Motor stopped");
+  tft.setCursor(12, 73);
+  tft.print("for safety.");
 
-  drawHints("RESET", "RESET+HOME", "");
+  drawHints("RESET", "HOME", "", false, false, 0x2802);
 }
 
 // ── HOMING_CONFIRM ──
 static void renderHomingConfirm() {
   clearFullBand();
-  tft.drawRect(10, 30, SCREEN_W - 20, 50, COL_AMBER);
+  drawScreenHeader("! START HOMING?", COL_AMBER);
   tft.setTextSize(1);
   tft.setTextColor(TEXT_PRI);
-  tft.setCursor(20, 42);
-  tft.print("Start homing?");
-  tft.setTextColor(TEXT_SEC);
-  tft.setCursor(20, 58);
+  tft.setCursor(20, 35);
   tft.print("Slider will move");
-  tft.setCursor(20, 68);
+  tft.setCursor(20, 48);
   tft.print("to both endstops.");
+  tft.setTextColor(TEXT_SEC);
+  tft.setCursor(20, 70);
+  tft.print("Keep rail clear.");
 
-  drawHints("CANCEL", "CANCEL", "CONFIRM");
+  drawHints("CANCEL", "", "START", false, true);
 }
 
 // ── WIFI_SCAN (reuses drawList(), swaps in a "Scanning..." message mid-scan) ──
 static void renderWifiScan() {
   clearContentBand();
-  tft.fillRect(0, 0, SCREEN_W, 12, BG_PANEL);
-  tft.setTextSize(1);
-  tft.setTextColor(TEXT_PRI);
-  tft.setCursor(4, 2);
-  tft.print("Networks");
-  tft.drawFastHLine(0, 12, SCREEN_W, DIVIDER);
+  drawScreenHeader("< NETWORKS");
 
   // Scanning->results is a layout change, not just a content change, so the "Scanning..."
   // line has to be wiped explicitly -- clearContentBand() only fires on a screen change
@@ -566,7 +646,7 @@ static void renderWifiScan() {
   static bool wasScanning = false;
   bool scanning = wifiScanInProgress();
   if (scanning != wasScanning) {
-    tft.fillRect(0, 12, SCREEN_W, SCREEN_H - 24, BG_BASE);
+    tft.fillRect(0, HEADER_H, SCREEN_W, CONTENT_BOTTOM - HEADER_H, BG_BASE);
     wasScanning = scanning;
   }
 
@@ -575,18 +655,13 @@ static void renderWifiScan() {
   } else {
     drawList(SCREEN_WIFI_SCAN);
   }
-  drawHints("BACK", "MAIN", "SELECT");
+  drawHints("BACK", "MAIN", "OPEN");
 }
 
 // ── TEXT_EDIT (character wheel for STA/AP password entry) ──
 static void renderTextEdit() {
   clearContentBand();
-  tft.fillRect(0, 0, SCREEN_W, 12, BG_PANEL);
-  tft.setTextSize(1);
-  tft.setTextColor(TEXT_PRI, BG_PANEL);
-  tft.setCursor(4, 2);
-  tft.print(editTextLabel);
-  tft.drawFastHLine(0, 12, SCREEN_W, DIVIDER);
+  drawScreenHeader(editTextLabel, COL_CYAN);
 
   // The text entered so far, followed by the pending character drawn inverted so it reads
   // as a cursor sitting at the insertion point rather than as a stray glyph elsewhere on
@@ -658,12 +733,7 @@ static void renderWifiConnecting() {
 // 1 for the buttons (pull-ups) and 0 for the endstops (active high).
 static void renderDiagnostics() {
   clearContentBand();
-  tft.fillRect(0, 0, SCREEN_W, 12, BG_PANEL);
-  tft.setTextSize(1);
-  tft.setTextColor(TEXT_PRI, BG_PANEL);
-  tft.setCursor(4, 2);
-  tft.print("Diagnostics");
-  tft.drawFastHLine(0, 12, SCREEN_W, DIVIDER);
+  drawScreenHeader("DIAGNOSTICS");
 
   char buf[28];
   int sw = digitalRead(ENC_SW), b1 = digitalRead(BTN1), b2 = digitalRead(BTN2);
@@ -690,12 +760,7 @@ static void renderDiagnostics() {
 // ── MOTOR TEST (service screen) ──
 static void renderMotorTest() {
   clearContentBand();
-  tft.fillRect(0, 0, SCREEN_W, 12, BG_PANEL);
-  tft.setTextSize(1);
-  tft.setTextColor(TEXT_PRI, BG_PANEL);
-  tft.setCursor(4, 2);
-  tft.print("Motor Test");
-  tft.drawFastHLine(0, 12, SCREEN_W, DIVIDER);
+  drawScreenHeader("MOTOR TEST");
 
   char buf[24];
 
@@ -713,9 +778,8 @@ static void renderMotorTest() {
   snprintf(buf, sizeof(buf), "%.2fV %.0fmA", busVoltage_V, current_mA);
   textOpaque(4, 76, TEXT_SEC, buf, 16);
 
-  textOpaque(4, 90,  TEXT_DIM, "1=back 2=fwd tap", 20);
-  textOpaque(4, 100, TEXT_DIM, "turn=speed (o)=stop", 20);
-  textOpaque(4, 110, TEXT_DIM, "hold 1+2 3s = exit", 20);
+  textOpaque(4, 88, TEXT_DIM, "buttons=direction", 20);
+  textOpaque(4, 98, TEXT_DIM, "turn=speed press=stop", 23);
   drawHints("", "", "");
 }
 

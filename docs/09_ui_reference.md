@@ -38,17 +38,17 @@ Nearly every screen is built from three bands:
 
 ```
 y=0    ┌──────────────────────────────┐
-       │ status bar (12 px)           │  BG_PANEL + 1 px DIVIDER underneath
-y=12   ├──────────────────────────────┤
+       │ status bar (13 px)           │  BG_PANEL + 1 px DIVIDER underneath
+y=13   ├──────────────────────────────┤
        │                              │
-       │ content (104 px)             │  BG_BASE
+       │ content (100 px)             │  BG_BASE
        │                              │
-y=116  ├──────────────────────────────┤
-       │ button hints (12 px)         │  BG_PANEL + 1 px DIVIDER on top
+y=113  ├──────────────────────────────┤
+       │ button hints (15 px)         │  BG_PANEL + 1 px DIVIDER on top
 y=128  └──────────────────────────────┘
 ```
 
-The status bar shows a Bluetooth icon (left, 12×12), the title `Camera Slider`, and a
+The status bar shows a Bluetooth icon (left, 12×12), the title `CAMERA SLIDER`, and a
 battery icon (right, 12×12). List-style screens replace the title band with the screen's
 own name and drop the Bluetooth/battery icons.
 
@@ -62,8 +62,8 @@ encoder hint on the right, rather than spreading them left/middle/right.
 
 | Hint bar notation | Input |
 |---|---|
-| `1:` | BTN1, short press |
-| `2:` | BTN2, short press |
+| `▶` | BTN1, short press |
+| `☰` | BTN2, short press |
 | `(o)` | Encoder press |
 
 Rotation is never shown in the hint bar — it is always "adjust the thing on screen".
@@ -338,9 +338,9 @@ Things worth knowing before proposing changes — constraints first, then existi
    cleared is visibly blank until it is repainted. This is why the current design updates
    text in place (each glyph paints its own background) instead of clearing regions —
    a redesign that relies on large repainted areas will flicker.
-4. **Icons should stay as line art.** Photographic/AI-rendered icons were tried first and
-   were illegible at 32 px; they also cannot follow the theme. Drawn primitives can be
-   recoloured per state and cost almost nothing.
+4. **Icons should stay as primitives or short badges.** Photographic/AI-rendered icons
+   were illegible at 32 px and cannot follow the theme. The current UI uses drawn button
+   glyphs and three-letter menu badges that remain legible on the physical panel.
 
 **Known weak spots**
 
@@ -350,9 +350,9 @@ Things worth knowing before proposing changes — constraints first, then existi
   menu icons) or regenerated with the panel colour baked in.
 - **High Contrast flattens the tiles.** `BG_CARD` and `BG_BASE` are both pure black there,
   so unselected menu tiles have no visible boundary at all.
-- **The hint bar is cramped.** Two button hints plus the encoder hint on a 26-character
-  line means labels are abbreviated (`RESET+HOME` alone is 10 characters). Longer labels
-  will overflow silently.
+- **The hint bar is still width-constrained.** The 15 px band gives the glyphs enough
+  height, but action labels still need to stay short so the right-aligned encoder action
+  cannot collide with the two button actions.
 - **Mixed information density.** The service screens are deliberately dense text dumps,
   while the main screen is very sparse. They were designed at different times and do not
   share a visual system.

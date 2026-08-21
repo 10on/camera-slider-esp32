@@ -31,6 +31,7 @@ geometry, palette, glyph bitmaps and status-bar icons as
 // exactly like the panel.
 // ─────────────────────────────────────────────────────────────────────────────
 const SCREEN_W = 160, SCREEN_H = 128, SCALE = 4;
+const HEADER_H = 13, FOOTER_H = 15, CONTENT_BOTTOM = SCREEN_H - FOOTER_H;
 
 function css565(c) {
   const r = ((c >> 11) & 0x1f) * 255 / 31;
@@ -153,16 +154,23 @@ function textOpaque(x, y, fg, s, width = 0) {
 }
 
 function drawStatusBar(st) {
-  tft.fillRect(0, 0, SCREEN_W, 12, P.bgPanel);
+  tft.fillRect(0, 0, SCREEN_W, HEADER_H, P.bgPanel);
   tft.drawRGBBitmap(2, 0, ICONS12[st.bleConnected ? 'bt_on' : 'bt_off'], 12, 12);
   tft.setTextSize(1);
   tft.setTextColor(P.textPri, P.bgPanel);
   tft.setCursor(18, 2);
-  tft.print("Camera Slider");
+  tft.print("CAMERA SLIDER");
   const pct = st.batteryPercent;
   const level = pct >= 75 ? 4 : pct >= 50 ? 3 : pct >= 25 ? 2 : pct > 0 ? 1 : 0;
   tft.drawRGBBitmap(SCREEN_W - 14, 0, ICONS12['bat_' + level], 12, 12);
-  tft.drawFastHLine(0, 12, SCREEN_W, P.divider);
+  tft.drawFastHLine(0, HEADER_H - 1, SCREEN_W, P.divider);
+}
+
+function drawScreenHeader(title, color = P.textPri) {
+  tft.fillRect(0, 0, SCREEN_W, HEADER_H, P.bgPanel);
+  tft.setTextSize(1); tft.setTextColor(color, P.bgPanel);
+  tft.setCursor(4, 2); tft.print(title);
+  tft.drawFastHLine(0, HEADER_H - 1, SCREEN_W, P.divider);
 }
 
 function drawPositionBar(x, y, w, st) {
@@ -180,53 +188,69 @@ function drawPositionBar(x, y, w, st) {
   tft.drawFastVLine(tickX, y, h, P.textPri);
 }
 
-function drawHints(btn1, btn2, enc) {
-  tft.fillRect(0, SCREEN_H - 12, SCREEN_W, 12, P.bgPanel);
-  tft.drawFastHLine(0, SCREEN_H - 12, SCREEN_W, P.divider);
+function drawButtonGlyph(x, y, primary, color) {
+  if (primary) tft.fillTriangle(x, y, x, y + 7, x + 5, y + 3, color);
+  else {
+    tft.drawFastHLine(x, y + 1, 6, color);
+    tft.drawFastHLine(x, y + 3, 6, color);
+    tft.drawFastHLine(x, y + 5, 6, color);
+  }
+}
+
+function drawHints(btn1, btn2, enc, btn1Dim = false, btn2Dim = false, footerBg = P.bgPanel) {
+  tft.fillRect(0, CONTENT_BOTTOM, SCREEN_W, FOOTER_H, footerBg);
+  tft.drawFastHLine(0, CONTENT_BOTTOM, SCREEN_W, P.divider);
   tft.setTextSize(1);
-  tft.setTextColor(P.textSec, P.bgPanel);
-  let left = "";
-  if (btn1) left += "1:" + btn1;
-  if (btn2) left += (left ? "  " : "") + "2:" + btn2;
-  tft.setCursor(2, SCREEN_H - 9);
-  tft.print(left);
+  let x = 3, y = CONTENT_BOTTOM + 4;
+  if (btn1 !== null) {
+    const c = btn1Dim ? P.textDim : P.textSec;
+    drawButtonGlyph(x, y, true, c); x += 8;
+    tft.setTextColor(c, footerBg); tft.setCursor(x, y); tft.print(btn1);
+    x += btn1.length * 6 + 5;
+  }
+  if (btn2 !== null) {
+    const c = btn2Dim ? P.textDim : P.textSec;
+    drawButtonGlyph(x, y, false, c); x += 8;
+    tft.setTextColor(c, footerBg); tft.setCursor(x, y); tft.print(btn2);
+  }
   if (enc) {
     const right = "(o)" + enc;
-    tft.setCursor(SCREEN_W - 2 - right.length * 6, SCREEN_H - 9);
+    tft.setTextColor(P.cyan, footerBg);
+    tft.setCursor(SCREEN_W - 3 - right.length * 6, y);
     tft.print(right);
   }
 }
 
 function drawList(items, sel) {
-  const rowH = 18, startY = 14;
-  const visible = Math.floor((SCREEN_H - 14 - 12) / rowH);
+  const rowH = 20, startY = HEADER_H;
+  const visible = Math.floor((CONTENT_BOTTOM - startY) / rowH);
   let offset = 0;
   if (sel >= visible) offset = sel - visible + 1;
   for (let i = 0; i < visible && (offset + i) < items.length; i++) {
     const idx = offset + i, y = startY + i * rowH, isSel = idx === sel;
     tft.fillRect(0, y, SCREEN_W, rowH, isSel ? P.bgHighlight : P.bgBase);
-    if (isSel) tft.drawFastVLine(0, y, rowH, P.sel);
+    if (i > 0) tft.drawFastHLine(0, y, SCREEN_W, P.divider);
+    if (isSel) tft.fillRect(0, y, 2, rowH, P.sel);
     tft.setTextSize(1);
     tft.setTextColor(isSel ? P.sel : P.textPri);
-    tft.setCursor(6, y + 5);
+    tft.setCursor(8, y + 6);
     tft.print(items[idx].label);
     const val = items[idx].value || "";
     if (val) {
       tft.setTextColor(isSel ? P.sel : P.textSec);
-      tft.setCursor(SCREEN_W - 6 - val.length * 6, y + 5);
+      tft.setCursor(SCREEN_W - 6 - val.length * 6, y + 6);
       tft.print(val);
     }
   }
 }
 
 function listHeader(title) {
-  tft.fillRect(0, 12, SCREEN_W, SCREEN_H - 24, P.bgBase);
-  tft.fillRect(0, 0, SCREEN_W, 12, P.bgPanel);
-  tft.setTextSize(1);
-  tft.setTextColor(P.textPri);
-  tft.setCursor(4, 2);
-  tft.print(title);
-  tft.drawFastHLine(0, 12, SCREEN_W, P.divider);
+  tft.fillRect(0, HEADER_H, SCREEN_W, CONTENT_BOTTOM - HEADER_H, P.bgBase);
+  drawScreenHeader("< " + title.toUpperCase());
+}
+
+function formatSteps(value) {
+  return Number(value).toLocaleString('en-US').replaceAll(',', ' ');
 }
 
 // ── Menu tile icons (GFX primitives, same as display.cpp) ────────────────────
@@ -276,98 +300,109 @@ function base() { tft.fillScreen(P.bgBase); }
 const SCREENS = {
   "main": () => {
     base(); drawStatusBar(S); drawPositionBar(4, 18, SCREEN_W - 8, S);
-    tft.setTextSize(3); textOpaque(4, 34, P.textPri, String(S.position), 8);
-    tft.setTextSize(1); textOpaque(4, 60, P.textSec, "steps", 24);
-    textOpaque(4, 76, P.textSec, S.speed + "%", 6);
-    textOpaque(40, 76, P.green, "IDLE", 8);
-    textOpaque(96, 76, P.cyan, "  ", 2);
+    const value = formatSteps(S.position), total = "/ " + formatSteps(S.travel) + " TOTAL STEPS";
+    tft.setTextSize(3); textOpaque((SCREEN_W - value.length * 18) / 2, 34, P.textPri, value);
+    tft.setTextSize(1); textOpaque((SCREEN_W - total.length * 6) / 2, 60, P.textSec, total);
+    textOpaque(4, 77, P.textPri, S.speed + "%", 4);
+    tft.fillRect(32, 79, SCREEN_W - 58, 5, P.bgCard);
+    tft.fillRect(32, 79, Math.floor((SCREEN_W - 58) * S.speed / 100), 5, P.cyan);
+    textOpaque(4, 94, P.green, "IDLE", 9);
     drawHints("GO/STOP", "MENU", "GOTO");
   },
   "main-moving": () => {
     const st = { ...S, motorRunning: true, frac: 0.55 };
     base(); drawStatusBar(st); drawPositionBar(4, 18, SCREEN_W - 8, st);
-    tft.setTextSize(3); textOpaque(4, 34, P.textPri, "3120", 8);
-    tft.setTextSize(1); textOpaque(4, 60, P.textSec, "steps", 24);
-    textOpaque(4, 76, P.textSec, "75%", 6);
-    textOpaque(40, 76, P.cyan, "MOVING", 8);
-    textOpaque(96, 76, P.cyan, ">>", 2);
+    const value = "3 120", total = "/ 5 670 TOTAL STEPS";
+    tft.setTextSize(3); textOpaque((SCREEN_W - value.length * 18) / 2, 34, P.textPri, value);
+    tft.setTextSize(1); textOpaque((SCREEN_W - total.length * 6) / 2, 60, P.textSec, total);
+    textOpaque(4, 77, P.textPri, "75%", 4);
+    tft.fillRect(32, 79, SCREEN_W - 58, 5, P.bgCard);
+    tft.fillRect(32, 79, Math.floor((SCREEN_W - 58) * .75), 5, P.cyan);
+    textOpaque(4, 94, P.cyan, "MOVING", 9);
+    textOpaque(104, 94, P.cyan, ">>>", 3);
     drawHints("GO/STOP", "MENU", "GOTO");
   },
   "main-uncalibrated": () => {
     const st = { ...S, frac: 0 };
     base(); drawStatusBar(st); drawPositionBar(4, 18, SCREEN_W - 8, st);
-    tft.setTextSize(3); textOpaque(4, 34, P.textPri, "0*", 8);
-    tft.setTextSize(1); textOpaque(4, 60, P.textSec, "steps (not calibrated)", 24);
-    textOpaque(4, 76, P.textSec, "75%", 6);
-    textOpaque(40, 76, P.green, "IDLE", 8);
+    tft.setTextSize(3); textOpaque(62, 34, P.textPri, "0*");
+    tft.setTextSize(1); textOpaque(8, 60, P.textSec, "POSITION NOT CALIBRATED");
+    textOpaque(4, 77, P.textPri, "75%", 4);
+    tft.fillRect(32, 79, SCREEN_W - 58, 5, P.bgCard);
+    tft.fillRect(32, 79, Math.floor((SCREEN_W - 58) * .75), 5, P.cyan);
+    textOpaque(4, 94, P.green, "IDLE", 9);
     drawHints("GO/STOP", "MENU", "GOTO");
   },
   "menu": () => {
-    base(); drawStatusBar(S);
+    base(); drawScreenHeader("MENU", P.purple);
     const labels = ["Manual Move", "Position", "Calibration", "Settings"];
-    const cellW = SCREEN_W / 2, cellH = (SCREEN_H - 24) / 2;
+    const badges = ["MOV", "POS", "CAL", "SET"];
+    const cellW = SCREEN_W / 2, cellH = (CONTENT_BOTTOM - HEADER_H) / 2;
     for (let i = 0; i < 4; i++) {
       const col = i % 2, row = Math.floor(i / 2);
-      const x = col * cellW, y = 12 + row * cellH, sel = (i === 0);
-      tft.fillRect(x + 1, y + 1, cellW - 2, cellH - 2, sel ? P.bgHighlight : P.bgCard);
-      if (sel) tft.drawRect(x + 1, y + 1, cellW - 2, cellH - 2, P.sel);
-      MENU_ICONS[i](x + cellW / 2, y + 20, sel ? P.sel : P.textSec,
-                    sel ? P.bgHighlight : P.bgCard);
+      const x = col * cellW, y = HEADER_H + row * cellH, sel = (i === 0);
+      const tileBg = sel ? P.bgHighlight : P.bgBase;
+      tft.fillRect(x, y, cellW, cellH, tileBg); tft.drawRect(x, y, cellW, cellH, P.divider);
+      if (sel) { tft.drawRect(x + 1, y + 1, cellW - 2, cellH - 2, P.sel); tft.drawRect(x + 2, y + 2, cellW - 4, cellH - 4, P.sel); }
+      const iconColor = i === 2 ? P.amber : (i === 3 ? P.purple : (sel ? P.sel : P.textSec));
+      tft.fillRect(x + 29, y + 7, 22, 17, P.bgCard);
+      tft.setTextSize(1); tft.setTextColor(iconColor, P.bgCard); tft.setCursor(x + 31, y + 12); tft.print(badges[i]);
       tft.setTextSize(1);
-      tft.setTextColor(sel ? P.sel : P.textPri);
-      tft.setCursor(x + (cellW - labels[i].length * 6) / 2, y + cellH - 10);
+      tft.setTextColor(sel ? P.textPri : P.textSec, tileBg);
+      tft.setCursor(x + (cellW - labels[i].length * 6) / 2, y + cellH - 13);
       tft.print(labels[i]);
     }
-    drawHints("BACK", "MAIN", "SELECT");
+    drawHints("", "BACK", "OPEN");
   },
   "manual-move": () => {
-    base(); drawStatusBar(S);
-    tft.setTextSize(2); textOpaque(20, 30, P.textSec, "STOPPED", 7);
-    tft.setTextSize(1); textOpaque(4, 60, P.textSec, "Speed: 75%", 12);
+    base(); drawScreenHeader("MANUAL MOVE");
+    for (let i = 0; i < 3; i++) { const cx = 66 + i * 14; tft.fillTriangle(cx, 35, cx, 47, cx + 8, 41, P.textSec); }
+    tft.setTextSize(1); textOpaque(59, 56, P.textSec, "STOPPED");
+    textOpaque(34, 77, P.textPri, "75%", 4); tft.fillRect(58, 79, 72, 5, P.bgCard); tft.fillRect(58, 79, 54, 5, P.cyan);
     drawHints("BACK", "MAIN", "REVERSE");
   },
   "manual-move-running": () => {
-    const st = { ...S, motorRunning: true };
-    base(); drawStatusBar(st);
-    tft.setTextSize(2); textOpaque(20, 30, P.cyan, ">> FWD", 7);
-    tft.setTextSize(1); textOpaque(4, 60, P.textSec, "Speed: 75%", 12);
+    base(); drawScreenHeader("MANUAL MOVE");
+    for (let i = 0; i < 3; i++) { const cx = 66 + i * 14; tft.fillTriangle(cx, 35, cx, 47, cx + 8, 41, P.cyan); }
+    tft.setTextSize(1); textOpaque(59, 56, P.textSec, "FORWARD");
+    textOpaque(34, 77, P.textPri, "75%", 4); tft.fillRect(58, 79, 72, 5, P.bgCard); tft.fillRect(58, 79, 54, 5, P.cyan);
     drawHints("BACK", "MAIN", "REVERSE");
   },
   "go-to-position": () => {
-    base(); drawStatusBar(S); tft.setTextSize(1);
-    textOpaque(4, 20, P.textSec, "Current: " + S.position, 18);
-    textOpaque(4, 32, P.textSec, "Target:  " + S.target, 18);
-    textOpaque(4, 44, P.textSec, "Travel:  " + S.travel, 18);
-    drawPositionBar(4, 60, SCREEN_W - 8, S);
+    base(); drawScreenHeader("GO TO POSITION"); tft.setTextSize(1);
+    const barX = 24, barY = 29, barW = 112, currentX = barX + Math.floor(barW * S.position / S.travel), targetX = barX + Math.floor(barW * S.target / S.travel);
+    textOpaque(4, 28, P.textSec, "E1"); textOpaque(142, 28, P.textSec, "E2");
+    tft.fillRect(barX, barY, barW, 8, P.bgCard); tft.fillRect(barX, barY, currentX - barX, 8, P.green); tft.drawFastVLine(currentX, barY - 1, 10, P.textPri);
+    for (let y = barY - 2; y < barY + 10; y += 3) tft.drawFastVLine(targetX, y, 2, P.purple);
+    const value = formatSteps(S.target); tft.setTextSize(3); textOpaque((SCREEN_W - value.length * 18) / 2, 49, P.purple, value);
+    tft.setTextSize(1); textOpaque(46, 79, P.textSec, "TARGET STEPS");
     drawHints("BACK", "MAIN", "GO");
   },
   "go-to-position-uncal": () => {
-    base(); drawStatusBar(S); tft.setTextSize(1);
-    textOpaque(10, 50, P.amber, "Not calibrated", 16);
+    base(); drawScreenHeader("GO TO POSITION"); tft.setTextSize(1);
+    textOpaque(34, 49, P.amber, "NOT CALIBRATED", 15);
     drawHints("BACK", "MAIN", "");
   },
   "calibration": () => {
-    base(); drawStatusBar(S); tft.setTextSize(1);
-    textOpaque(10, 30, P.textPri, "Calibrated", 16);
-    textOpaque(10, 44, P.textSec, "Travel: " + S.travel, 18);
-    textOpaque(10, 56, P.textSec, "Center: " + S.center, 18);
-    drawHints("BACK", "MAIN", "START");
+    base(); drawScreenHeader("CALIBRATION", P.amber); tft.setTextSize(1);
+    textOpaque(22, 38, P.textSec, "Travel: 5 670 steps", 22);
+    textOpaque(22, 55, P.textSec, "Center: 2 835 steps", 22);
+    textOpaque(43, 78, P.green, "+ CALIBRATED", 12);
+    drawHints("BACK", "MAIN", "RE-HOME");
   },
   "calibration-homing": () => {
-    const st = { ...S, motorRunning: true };
-    base(); drawStatusBar(st); tft.setTextSize(1);
-    textOpaque(10, 30, P.amber, "Seeking END2...", 16);
-    textOpaque(10, 46, P.textSec, "Phase 3 / 6", 14);
-    const barW = SCREEN_W - 20, done = Math.floor(barW * 3 / 6);
-    tft.fillRect(10, 60, done, 8, P.amber);
-    tft.fillRect(10 + done, 60, barW - done, 8, P.bgCard);
-    drawHints("", "ABORT", "");
+    base(); drawScreenHeader("HOMING", P.amber); tft.setTextSize(1);
+    textOpaque(35, 27, P.textPri, "Seeking END2...", 16);
+    for (let i = 0; i < 6; i++) tft.fillCircle(52 + i * 11, 48, 3, i < 3 ? P.amber : P.textDim);
+    textOpaque(47, 62, P.textSec, "Phase 3 / 6", 11);
+    for (let i = 0; i < 5; i++) { const cx = 47 + i * 14; tft.fillTriangle(cx, 81, cx, 91, cx + 8, 86, P.amber); }
+    drawHints("", "ABORT", "", true, false);
   },
   "settings": () => {
     listHeader("Settings");
     drawList([{ label: "Motion" }, { label: "Sleep" }, { label: "System" },
               { label: "Wireless" }], 0);
-    drawHints("BACK", "MAIN", "SELECT");
+    drawHints("BACK", "MAIN", "OPEN");
   },
   "settings-motion": () => {
     listHeader("Motion");
@@ -375,13 +410,13 @@ const SCREENS = {
               { label: "Microsteps", value: "32" },
               { label: "Endstop Mode", value: "Stop" },
               { label: "Homing Speed", value: "400us" }], 0);
-    drawHints("BACK", "MAIN", "SELECT");
+    drawHints("BACK", "MAIN", "OPEN");
   },
   "settings-sleep": () => {
     listHeader("Sleep");
     drawList([{ label: "Sleep Timeout", value: "5min" },
               { label: "ADXL Sensitivity", value: "Mid" }], 0);
-    drawHints("BACK", "MAIN", "SELECT");
+    drawHints("BACK", "MAIN", "OPEN");
   },
   "settings-system": () => {
     listHeader("System");
@@ -389,13 +424,13 @@ const SCREENS = {
               { label: "Reset Calibration" }, { label: "Reset Error" },
               { label: "Theme", value: "Dark" }, { label: "Brightness", value: "80%" },
               { label: "Diagnostics" }, { label: "Motor Test" }], 0);
-    drawHints("BACK", "MAIN", "SELECT");
+    drawHints("BACK", "MAIN", "OPEN");
   },
   "settings-wireless": () => {
     listHeader("Wireless");
     drawList([{ label: "Bluetooth", value: "On" },
               { label: "WiFi", value: "192.168.8.237" }], 0);
-    drawHints("BACK", "MAIN", "SELECT");
+    drawHints("BACK", "MAIN", "OPEN");
   },
   "wifi-mode": () => {
     listHeader("WiFi");
@@ -452,33 +487,32 @@ const SCREENS = {
     const buf = "75";
     tft.setTextSize(3);
     const w = buf.length * 18, x = Math.floor((SCREEN_W - w) / 2);
-    tft.setTextColor(P.cyan, P.bgBase); tft.setCursor(x, 44); tft.print(buf);
-    tft.fillRect(10, 84, SCREEN_W - 20, 6, P.bgCard);
-    tft.fillRect(10, 84, Math.round((SCREEN_W - 20) * (75 - 1) / 99), 6, P.cyan);
-    drawHints("CANCEL", "", "SAVE");
+    tft.setTextColor(P.cyan, P.bgBase); tft.setCursor(x, 37); tft.print(buf);
+    tft.setTextSize(1); textOpaque(4, 72, P.textDim, "MIN"); textOpaque(4, 82, P.textSec, "1", 8);
+    textOpaque(138, 72, P.textDim, "MAX"); textOpaque(138, 82, P.textSec, "100");
+    tft.fillRect(24, 96, SCREEN_W - 48, 6, P.bgCard);
+    tft.fillRect(24, 96, Math.round((SCREEN_W - 48) * (75 - 1) / 99), 6, P.cyan);
+    drawHints("CANCEL", "", "SAVE", false, true);
   },
   "value-edit-named": () => {
     listHeader("Endstop Mode");
-    tft.setTextSize(2); textOpaque(4, 44, P.cyan, "Bounce", 13);
-    drawHints("CANCEL", "", "SAVE");
+    const name = "Bounce"; tft.setTextSize(2); textOpaque((SCREEN_W - name.length * 12) / 2, 43, P.cyan, name);
+    tft.setTextSize(1); textOpaque(52, 76, P.textSec, "SELECT VALUE");
+    drawHints("CANCEL", "", "SAVE", false, true);
   },
   "homing-confirm": () => {
-    tft.fillRect(0, 0, SCREEN_W, SCREEN_H - 12, P.bgBase);
-    tft.drawRect(10, 30, SCREEN_W - 20, 50, P.amber);
-    tft.setTextSize(1);
-    tft.setTextColor(P.textPri); tft.setCursor(20, 42); tft.print("Start homing?");
-    tft.setTextColor(P.textSec);
-    tft.setCursor(20, 58); tft.print("Slider will move");
-    tft.setCursor(20, 68); tft.print("to both endstops.");
-    drawHints("CANCEL", "CANCEL", "CONFIRM");
+    base(); drawScreenHeader("! START HOMING?", P.amber); tft.setTextSize(1);
+    tft.setTextColor(P.textPri); tft.setCursor(20, 35); tft.print("Slider will move");
+    tft.setCursor(20, 48); tft.print("to both endstops.");
+    tft.setTextColor(P.textSec); tft.setCursor(20, 70); tft.print("Keep rail clear.");
+    drawHints("CANCEL", "", "START", false, true);
   },
   "error": () => {
-    tft.fillScreen(P.bgBase);
-    tft.setTextSize(2); tft.setTextColor(P.red);
-    tft.setCursor(20, 20); tft.print("ERROR");
-    tft.setTextSize(1); tft.setTextColor(P.textPri);
-    tft.setCursor(10, 50); tft.print("BLE Lost");
-    drawHints("RESET", "RESET+HOME", "");
+    tft.fillScreen(0x1802); tft.fillRect(0, 0, SCREEN_W, HEADER_H, 0x2802);
+    tft.setTextSize(1); tft.setTextColor(P.red, 0x2802); tft.setCursor(4, 2); tft.print("! SYSTEM ERROR");
+    tft.setTextColor(P.textPri, 0x1802); tft.setCursor(12, 35); tft.print("BLE Lost");
+    tft.setTextColor(0xC18F, 0x1802); tft.setCursor(12, 62); tft.print("Motor stopped"); tft.setCursor(12, 73); tft.print("for safety.");
+    drawHints("RESET", "HOME", "", false, false, 0x2802);
   },
   "diagnostics": () => {
     listHeader("Diagnostics");
@@ -493,7 +527,6 @@ const SCREENS = {
     drawHints("", "", "");
   },
   "motor-test": () => {
-    const st = { ...S, motorRunning: true };
     listHeader("Motor Test");
     tft.setTextSize(2); textOpaque(4, 18, P.cyan, "FWD >>", 7);
     tft.setTextSize(1);
@@ -501,9 +534,8 @@ const SCREENS = {
     textOpaque(4, 52, P.textSec, "Pos: 1234", 16);
     textOpaque(4, 64, P.textSec, "E1:0  E2:0", 14);
     textOpaque(4, 76, P.textSec, "12.34V 850mA", 16);
-    textOpaque(4, 90, P.textDim, "1=back 2=fwd tap", 20);
-    textOpaque(4, 100, P.textDim, "turn=speed (o)=stop", 20);
-    textOpaque(4, 110, P.textDim, "hold 1+2 3s = exit", 20);
+    textOpaque(4, 88, P.textDim, "buttons=direction", 20);
+    textOpaque(4, 98, P.textDim, "turn=speed press=stop", 23);
     drawHints("", "", "");
   },
   "ota-update": () => {
