@@ -11,6 +11,7 @@
 #include "pins.h"
 #include "globals.h"
 #include "state.h"
+#include "config.h"
 
 class ServerCallbacks : public BLEServerCallbacks {
   void onConnect(BLEServer* pServer) {
@@ -61,8 +62,20 @@ class SpeedCallbacks : public BLECharacteristicCallbacks {
     uint8_t* data = pChar->getData();
     size_t len = pChar->getValue().length();
     if (len >= 2) {
-      cmdNewSpeed = data[0] | (data[1] << 8);
-      cmdSpeedChanged = true;
+      uint16_t value = data[0] | (data[1] << 8);
+      // The public BLE protocol defines this characteristic as an interval in
+      // microseconds (100..5000, lower is faster).  cfg.speed was later changed to a
+      // 1..100 percentage, but the wire format must remain stable for existing clients.
+      // Also accept 1..99 as an explicit percentage for the short-lived development
+      // firmware that exposed the internal representation by mistake; 100 means fastest
+      // in both encodings.
+      if (value >= 1 && value <= 100) {
+        cmdNewSpeed = value;
+        cmdSpeedChanged = true;
+      } else if (value <= 5000) {
+        cmdNewSpeed = intervalToSpeed(value);
+        cmdSpeedChanged = true;
+      }
     }
   }
 };

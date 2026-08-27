@@ -21,10 +21,30 @@ static const WifiCred WIFI_CREDENTIALS[] = {};
 static const size_t WIFI_CREDENTIALS_COUNT = 0;
 #endif
 
-// Speed level (1-100) -> us/step for timer. Level 1 = 5000us (slowest), level 100 = 100us
-// (fastest).
+// Speed level (1-100) -> us/step for the timer. Level 1 = 5000us (slowest), level 100 =
+// 100us (fastest).
+//
+// The map is geometric, not linear. Perceived speed is step *frequency* (1/interval); a
+// linear interval ramp (the old `map(level,1,100,5000,100)`) barely moved the frequency
+// until the last few percent, then shot up 25x between 96% and 100%. Here every +1%
+// multiplies the frequency by a constant ratio (~4%), so the dial feels linear end to end:
+//   level 1  -> 5000us (~200 steps/s)
+//   level 25 -> ~2000us (~500 steps/s)
+//   level 50 -> ~810us  (~1240 steps/s)
+//   level 75 -> ~325us  (~3070 steps/s)
+//   level 100 -> 100us  (10000 steps/s)
+static const float kSpeedSlowUs = 5000.0f;
+static const float kSpeedFastUs = 100.0f;
+
 uint32_t speedToInterval(int32_t level) {
-  return map(constrain(level, 1, 100), 1, 100, 5000, 100);
+  float t = (constrain(level, 1, 100) - 1) / 99.0f;
+  return (uint32_t)lroundf(kSpeedSlowUs * powf(kSpeedFastUs / kSpeedSlowUs, t));
+}
+
+uint16_t intervalToSpeed(uint32_t intervalUs) {
+  float ratio = constrain(intervalUs, 100UL, 5000UL) / kSpeedSlowUs;
+  float t = logf(ratio) / logf(kSpeedFastUs / kSpeedSlowUs);
+  return (uint16_t)constrain((long)lroundf(1.0f + t * 99.0f), 1L, 100L);
 }
 
 static void configDefaults() {
