@@ -23,26 +23,27 @@
 // Tile labels are hard-capped at 13 chars: the 2x2 grid gives each tile 80px and the
 // font is 6px/char, so anything longer runs past the tile edge ("Go to Position" at 14
 // chars did exactly that).
-static const char* MENU_ITEMS[]    = { "Manual Move", "Position", "Calibration", "Settings" };
+static const char* MENU_ITEMS[]    = { "Manual Move", "Position", "Ping Pong", "Calibration", "Settings" };
 static const char* SETTINGS_ITEMS[] = { "Motion", "Sleep", "System", "Wireless" };
-static const char* MOTION_ITEMS[]  = { "Speed", "Ramp", "Microsteps", "Endstop Mode", "Homing Speed" };
+static const char* MOTION_ITEMS[]  = { "Speed", "Ramp", "Microsteps", "Endstop Mode", "Homing Speed", "PingPong Start" };
 static const char* SLEEP_ITEMS[]   = { "Sleep Timeout", "ADXL Sensitivity" };
-static const char* SYSTEM_ITEMS[]  = { "Motor Current", "Reset Calibration", "Reset Error", "Theme", "Brightness", "Diagnostics", "Motor Test" };
+static const char* SYSTEM_ITEMS[]  = { "Motor Current", "Reset Calibration", "Reset Error", "Theme", "Brightness", "Diagnostics", "Motor Test", "Speaker" };
 static const char* WIRELESS_ITEMS[] = { "Bluetooth", "WiFi" };
 static const char* WIFI_MODE_ITEMS[] = { "Off", "Connect to Network", "Create Hotspot" };
 
 static const char* ENDSTOP_MODE_NAMES[] = { "Stop", "Bounce", "Park" };
+static const char* PINGPONG_START_NAMES[] = { "Center", "Endstop 1", "Endstop 2" };
 static const char* ADXL_SENS_NAMES[]    = { "Off", "Low", "Mid", "High" };
 static const char* BLE_NAMES[]          = { "Off", "On" };
 static const char* THEME_NAMES[]        = { "Dark", "Light", "High Contrast" };
 
 int menuItemCount(MenuScreen screen) {
   switch (screen) {
-    case SCREEN_MENU:               return 4;
+    case SCREEN_MENU:               return 5;
     case SCREEN_SETTINGS:           return 4;
-    case SCREEN_MOTION_SETTINGS:    return 5;
+    case SCREEN_MOTION_SETTINGS:    return 6;
     case SCREEN_SLEEP_SETTINGS:     return 2;
-    case SCREEN_SYSTEM_SETTINGS:    return 7;
+    case SCREEN_SYSTEM_SETTINGS:    return 8;
     case SCREEN_WIRELESS_SETTINGS:  return 2;
     case SCREEN_WIFI_MODE:          return 3;
     case SCREEN_WIFI_SCAN:          return wifiScanResultCount() + 1;  // +1 = "Rescan"
@@ -75,6 +76,7 @@ void menuItemValueText(MenuScreen screen, int idx, char* buf, size_t bufsize) {
         case 2: snprintf(buf, bufsize, "%u", cfg.microsteps); break;
         case 3: snprintf(buf, bufsize, "%s", ENDSTOP_MODE_NAMES[cfg.endstopMode]); break;
         case 4: snprintf(buf, bufsize, "%uus", cfg.homingSpeed); break;
+        case 5: snprintf(buf, bufsize, "%s", PINGPONG_START_NAMES[cfg.pingPongStart]); break;
       }
       break;
     case SCREEN_SLEEP_SETTINGS:
@@ -88,6 +90,7 @@ void menuItemValueText(MenuScreen screen, int idx, char* buf, size_t bufsize) {
         case 0: snprintf(buf, bufsize, "%umA", cfg.motorCurrent); break;
         case 3: snprintf(buf, bufsize, "%s", THEME_NAMES[cfg.theme]); break;
         case 4: snprintf(buf, bufsize, "%u%%", cfg.brightness); break;
+        case 7: snprintf(buf, bufsize, "%s", cfg.speakerEnabled ? "On" : "Off"); break;
       }
       break;
     case SCREEN_WIRELESS_SETTINGS:
@@ -120,6 +123,7 @@ static void onMicrostepsChanged(int32_t v) {
 }
 static void onEndstopModeChanged(int32_t v) { cfg.endstopMode = v; configSave(); }
 static void onHomingSpeedChanged(int32_t v) { cfg.homingSpeed = v; configSave(); }
+static void onPingPongStartChanged(int32_t v) { cfg.pingPongStart = v; configSave(); }
 static void onSleepTOChanged(int32_t v)     { cfg.sleepTimeout = v; configSave(); }
 static void onAdxlSensChanged(int32_t v)    { cfg.adxlSensitivity = v; configSave(); }
 static void onCurrentChanged(int32_t v) {
@@ -137,9 +141,10 @@ static void onBrightnessChanged(int32_t v) {
   backlightSetBrightness(cfg.brightness);
   configSave();
 }
+static void onSpeakerToggle(int32_t v) { cfg.speakerEnabled = (v != 0); configSave(); }
 static void openEditor(const char* label, int32_t value, int32_t vmin, int32_t vmax,
                         int32_t step, void (*cb)(int32_t), MenuScreen returnScreen,
-                        const char* const* names = NULL) {
+                        const char* const* names = NULL, const char* unit = NULL) {
   editLabel = label;
   editValue = value;
   editMin = vmin;
@@ -147,6 +152,7 @@ static void openEditor(const char* label, int32_t value, int32_t vmin, int32_t v
   editStep = step;
   editCallback = cb;
   editReturnScreen = returnScreen;
+  editUnit = unit;
   editValueNames = names;
   currentScreen = SCREEN_VALUE_EDIT;
   displayDirty = true;
@@ -249,13 +255,14 @@ static void handleMain(int32_t delta) {
 }
 
 static void handleMenu(int32_t delta) {
-  if (delta != 0) { menuIndex = wrapIndex(menuIndex + delta, 4); displayDirty = true; }
+  if (delta != 0) { menuIndex = wrapIndex(menuIndex + delta, 5); displayDirty = true; }
   if (encoderPressed) {
     switch (menuIndex) {
       case 0: goScreen(SCREEN_MANUAL_MOVE); break;
       case 1: prevScreen = SCREEN_MENU; cmdTargetPos = currentPosition; goScreen(SCREEN_GO_TO_POS); break;
-      case 2: goScreen(SCREEN_CALIBRATION); break;
-      case 3: goScreen(SCREEN_SETTINGS); break;
+      case 2: goScreen(SCREEN_PING_PONG); break;
+      case 3: goScreen(SCREEN_CALIBRATION); break;
+      case 4: goScreen(SCREEN_SETTINGS); break;
     }
   }
   if (btn1Pressed) goScreen(SCREEN_MAIN);
@@ -303,12 +310,34 @@ static void handleGoToPos(int32_t delta) {
   if (btn2LongPress) maybeEnterHomingConfirm(SCREEN_GO_TO_POS);
 }
 
+// BTN1 is the start/stop toggle here (matching the same convention as the Main screen and
+// Motor Test), not "back" like most other sub-screens -- the Start Position itself lives in
+// Motion Settings as an ordinary list item, deliberately not editable from here (see the
+// plan note: no accidental encoder-bump changes to it).
+static void handlePingPong(int32_t delta) {
+  if (delta != 0) {
+    cfg.speed = constrain((int32_t)cfg.speed + delta, 1, 100);
+    targetInterval = speedToInterval(cfg.speed);
+    if (motorRunning) rampStepsLeft = 50;
+    displayDirty = true;
+  }
+  if (btn1Pressed) {
+    if (motorRunning) {
+      cmdStop = true;
+    } else if (sliderState == STATE_IDLE) {
+      cmdPingPongStart = true;
+    }
+  }
+  if (btn2Pressed) goScreen(SCREEN_MENU, 2);
+  if (btn2LongPress && sliderState == STATE_IDLE) maybeEnterHomingConfirm(SCREEN_PING_PONG);
+}
+
 static void handleCalibration(int32_t /*delta*/) {
   bool homing = (sliderState == STATE_HOMING);
   if (encoderPressed && !homing && sliderState == STATE_IDLE) {
     homingStart();
   }
-  if (btn1Pressed && !homing) goScreen(SCREEN_MENU, 2);
+  if (btn1Pressed && !homing) goScreen(SCREEN_MENU, 3);
   if (btn2Pressed && !homing) goScreen(SCREEN_MAIN);
   if (btn2LongPress && homing) homingAbort();
 }
@@ -323,20 +352,21 @@ static void handleSettings(int32_t delta) {
       case 3: goScreen(SCREEN_WIRELESS_SETTINGS); break;
     }
   }
-  if (btn1Pressed) goScreen(SCREEN_MENU, 3);
+  if (btn1Pressed) goScreen(SCREEN_MENU, 4);
   if (btn2Pressed) goScreen(SCREEN_MAIN);
   if (btn2LongPress) maybeEnterHomingConfirm(SCREEN_SETTINGS);
 }
 
 static void handleMotionSettings(int32_t delta) {
-  if (delta != 0) { menuIndex = wrapIndex(menuIndex + delta, 5); displayDirty = true; }
+  if (delta != 0) { menuIndex = wrapIndex(menuIndex + delta, 6); displayDirty = true; }
   if (encoderPressed) {
     switch (menuIndex) {
-      case 0: openEditor("Speed", cfg.speed, 1, 100, 5, onSpeedChanged, SCREEN_MOTION_SETTINGS); break;
+      case 0: openEditor("Speed", cfg.speed, 1, 100, 5, onSpeedChanged, SCREEN_MOTION_SETTINGS, NULL, "%"); break;
       case 1: openEditor("Ramp Steps", cfg.rampSteps, 10, 1000, 10, onRampChanged, SCREEN_MOTION_SETTINGS); break;
       case 2: openEditor("Microsteps", cfg.microsteps, 1, 256, 0, onMicrostepsChanged, SCREEN_MOTION_SETTINGS); break;
       case 3: openEditor("Endstop Mode", cfg.endstopMode, 0, 2, 1, onEndstopModeChanged, SCREEN_MOTION_SETTINGS, ENDSTOP_MODE_NAMES); break;
-      case 4: openEditor("Homing Speed", cfg.homingSpeed, 100, 2000, 50, onHomingSpeedChanged, SCREEN_MOTION_SETTINGS); break;
+      case 4: openEditor("Homing Speed", cfg.homingSpeed, 100, 2000, 50, onHomingSpeedChanged, SCREEN_MOTION_SETTINGS, NULL, "us"); break;
+      case 5: openEditor("PingPong Start", cfg.pingPongStart, 0, 2, 1, onPingPongStartChanged, SCREEN_MOTION_SETTINGS, PINGPONG_START_NAMES); break;
     }
   }
   if (btn1Pressed) goScreen(SCREEN_SETTINGS, 0);
@@ -348,7 +378,7 @@ static void handleSleepSettings(int32_t delta) {
   if (delta != 0) { menuIndex = wrapIndex(menuIndex + delta, 2); displayDirty = true; }
   if (encoderPressed) {
     switch (menuIndex) {
-      case 0: openEditor("Sleep Timeout", cfg.sleepTimeout, 0, 60, 1, onSleepTOChanged, SCREEN_SLEEP_SETTINGS); break;
+      case 0: openEditor("Sleep Timeout", cfg.sleepTimeout, 0, 60, 1, onSleepTOChanged, SCREEN_SLEEP_SETTINGS, NULL, "min"); break;
       case 1: openEditor("ADXL Sens", cfg.adxlSensitivity, 0, 3, 1, onAdxlSensChanged, SCREEN_SLEEP_SETTINGS, ADXL_SENS_NAMES); break;
     }
   }
@@ -358,16 +388,17 @@ static void handleSleepSettings(int32_t delta) {
 }
 
 static void handleSystemSettings(int32_t delta) {
-  if (delta != 0) { menuIndex = wrapIndex(menuIndex + delta, 7); displayDirty = true; }
+  if (delta != 0) { menuIndex = wrapIndex(menuIndex + delta, 8); displayDirty = true; }
   if (encoderPressed) {
     switch (menuIndex) {
-      case 0: openEditor("Motor Current", cfg.motorCurrent, 200, 1500, 50, onCurrentChanged, SCREEN_SYSTEM_SETTINGS); break;
+      case 0: openEditor("Motor Current", cfg.motorCurrent, 200, 1500, 50, onCurrentChanged, SCREEN_SYSTEM_SETTINGS, NULL, "mA"); break;
       case 1: configResetCalibration(); displayDirty = true; break;
       case 2: stateResetError(); displayDirty = true; break;
       case 3: openEditor("Theme", cfg.theme, 0, 2, 1, onThemeChanged, SCREEN_SYSTEM_SETTINGS, THEME_NAMES); break;
-      case 4: openEditor("Brightness", cfg.brightness, 10, 100, 5, onBrightnessChanged, SCREEN_SYSTEM_SETTINGS); break;
+      case 4: openEditor("Brightness", cfg.brightness, 10, 100, 5, onBrightnessChanged, SCREEN_SYSTEM_SETTINGS, NULL, "%"); break;
       case 5: goScreen(SCREEN_DIAGNOSTICS); break;
       case 6: goScreen(SCREEN_MOTOR_TEST); break;
+      case 7: openEditor("Speaker", cfg.speakerEnabled ? 1 : 0, 0, 1, 1, onSpeakerToggle, SCREEN_SYSTEM_SETTINGS, BLE_NAMES); break;
     }
   }
   if (btn1Pressed) goScreen(SCREEN_SETTINGS, 2);
@@ -648,6 +679,7 @@ void menuHandleInput() {
     case SCREEN_MANUAL_MOVE:     handleManualMove(delta); break;
     case SCREEN_GO_TO_POS:       handleGoToPos(delta); break;
     case SCREEN_CALIBRATION:     handleCalibration(delta); break;
+    case SCREEN_PING_PONG:       handlePingPong(delta); break;
     case SCREEN_SETTINGS:        handleSettings(delta); break;
     case SCREEN_MOTION_SETTINGS: handleMotionSettings(delta); break;
     case SCREEN_SLEEP_SETTINGS:  handleSleepSettings(delta); break;

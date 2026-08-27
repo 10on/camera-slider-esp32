@@ -15,6 +15,10 @@
 #include "pins.h"
 #include "globals.h"
 
+static bool directionBlockedByEndstop(bool forward) {
+  return forward ? endstop2 : endstop1;
+}
+
 void IRAM_ATTR onStepTimer() {
   if (!motorRunning) return;
 
@@ -108,6 +112,14 @@ void motorInit() {
 
 // Start motor at constant speed (no ramp)
 void motorStart(bool forward, uint32_t intervalUs) {
+  // Last line of defence: no caller (BLE, UI, homing, parking, or a future mode) may
+  // start the carriage deeper into an endstop that is already held.  Higher layers still
+  // decide whether to stop, bounce, or park when a switch is reached while moving.
+  if (directionBlockedByEndstop(forward)) {
+    motorStopNow();
+    return;
+  }
+
   motorDirection = forward ? false : true;
   digitalWrite(MOTOR_DIR, motorDirection ? HIGH : LOW);
   delay(1);  // DIR setup time
@@ -126,6 +138,11 @@ void motorStart(bool forward, uint32_t intervalUs) {
 
 // Start motor with linear acceleration ramp
 void motorStartRamp(bool forward, uint32_t intervalUs) {
+  if (directionBlockedByEndstop(forward)) {
+    motorStopNow();
+    return;
+  }
+
   motorDirection = forward ? false : true;
   digitalWrite(MOTOR_DIR, motorDirection ? HIGH : LOW);
   delay(1);
@@ -151,6 +168,11 @@ void motorMoveTo(int32_t position, uint32_t intervalUs) {
   if (delta == 0) return;
 
   bool forward = delta > 0;
+  if (directionBlockedByEndstop(forward)) {
+    motorStopNow();
+    return;
+  }
+
   motorDirection = forward ? false : true;
   digitalWrite(MOTOR_DIR, motorDirection ? HIGH : LOW);
   delay(1);

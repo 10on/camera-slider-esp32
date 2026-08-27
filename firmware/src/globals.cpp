@@ -20,6 +20,7 @@ BLECharacteristic* pSpeedChar    = NULL;
 BLECharacteristic* pPositionChar = NULL;
 BLECharacteristic* pCurrentChar  = NULL;
 BLECharacteristic* pConfigChar   = NULL;
+BLECharacteristic* pProgramChar  = NULL;
 
 volatile bool bleConnected    = false;
 volatile bool bleWasConnected = false;
@@ -30,10 +31,17 @@ volatile bool     cmdStop           = false;
 volatile bool     cmdHome           = false;
 volatile bool     cmdGoToPos        = false;
 volatile int32_t  cmdTargetPos      = 0;
+volatile bool     cmdPingPongStart  = false;
 volatile bool     cmdSpeedChanged   = false;
 volatile uint16_t cmdNewSpeed       = 0;
 volatile bool     cmdCurrentChanged = false;
 volatile uint16_t cmdNewCurrent     = 0;
+volatile bool     cmdProgramPending = false;
+volatile uint8_t  cmdProgramId = PROGRAM_PING_PONG;
+volatile uint8_t  cmdProgramAction = PROGRAM_SELECT;
+volatile uint8_t  cmdProgramSpeed = 0;
+volatile uint8_t  cmdProgramStartPoint = 0xFF;
+volatile uint8_t  cmdProgramFlags = 0;
 
 volatile int32_t  currentPosition = 0;
 volatile bool     motorRunning    = false;
@@ -51,6 +59,8 @@ hw_timer_t* stepTimer = NULL;
 SliderState sliderState = STATE_IDLE;
 ErrorCode   errorCode   = ERR_NONE;
 HomingPhase homingPhase = HOME_IDLE;
+bool        pingPongApproaching = false;
+uint8_t     selectedProgram = PROGRAM_PING_PONG;
 
 int32_t travelDistance = 0;
 int32_t centerPosition = 0;
@@ -69,6 +79,7 @@ bool    btn2LongPress  = false;
 
 float busVoltage_V = 0;
 float current_mA   = 0;
+bool  isCharging    = false;
 
 float  adxlX = 0, adxlY = 0, adxlZ = 0;
 int8_t adxlMotionDir = 0;
@@ -88,6 +99,7 @@ int32_t     editStep  = 1;
 void (*editCallback)(int32_t) = NULL;
 MenuScreen  editReturnScreen = SCREEN_MAIN;
 const char* const* editValueNames = NULL;
+const char*         editUnit = NULL;
 
 char        editText[33]      = "";
 int8_t      editTextLen       = 0;

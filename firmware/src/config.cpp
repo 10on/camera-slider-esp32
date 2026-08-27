@@ -70,6 +70,10 @@ static void configDefaults() {
 
   cfg.theme = THEME_DARK;
   cfg.brightness = 80;  // ~= the old hardcoded DEFAULT_BACKLIGHT (200/255)
+
+  cfg.speakerEnabled = true;
+
+  cfg.pingPongStart = 0;  // Center
 }
 
 void configLoad() {
@@ -98,6 +102,8 @@ void configLoad() {
   if (cfg.apPass[0] == 0) strncpy(cfg.apPass, "slider1234", sizeof(cfg.apPass) - 1);
   cfg.theme = preferences.getUChar("theme", cfg.theme);
   cfg.brightness = preferences.getUChar("bright", cfg.brightness);
+  cfg.speakerEnabled = preferences.getBool("spkEn", cfg.speakerEnabled);
+  cfg.pingPongStart = preferences.getUChar("ppStart", cfg.pingPongStart);
 
   // One-time repair: an earlier build of this seeding logic (before wifiMode was left
   // off by default) could have already persisted wifiMode=STA against the literal
@@ -154,6 +160,8 @@ void configSave() {
   preferences.putString("apPass", cfg.apPass);
   preferences.putUChar("theme", cfg.theme);
   preferences.putUChar("bright", cfg.brightness);
+  preferences.putBool("spkEn", cfg.speakerEnabled);
+  preferences.putUChar("ppStart", cfg.pingPongStart);
 
   preferences.end();
 }

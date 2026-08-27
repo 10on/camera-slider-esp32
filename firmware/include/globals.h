@@ -24,7 +24,8 @@ enum SliderState {
   STATE_HOMING,
   STATE_PARKING,
   STATE_ERROR,
-  STATE_SLEEP
+  STATE_SLEEP,
+  STATE_PING_PONG   // appended, not inserted -- keeps existing values' BLE Status numbering stable
 };
 
 enum ErrorCode {
@@ -48,6 +49,20 @@ enum EndstopMode {
   ENDSTOP_STOP   = 0,
   ENDSTOP_BOUNCE = 1,
   ENDSTOP_PARK   = 2
+};
+
+// High-level control API. Programs own their motion logic on the slider; BLE clients
+// select/configure/start them instead of streaming motor-direction commands.
+enum SliderProgram : uint8_t {
+  PROGRAM_MANUAL    = 0,  // advanced/compatibility F/B/G control
+  PROGRAM_PING_PONG = 1
+};
+
+enum ProgramAction : uint8_t {
+  PROGRAM_SELECT    = 0,
+  PROGRAM_START     = 1,
+  PROGRAM_STOP      = 2,
+  PROGRAM_CONFIGURE = 3
 };
 
 // Not named WIFI_MODE_* -- that collides with ESP-IDF's own wifi_mode_t.
@@ -92,7 +107,8 @@ enum MenuScreen {
   SCREEN_TEXT_EDIT,          // new: generic character-wheel text entry (STA/AP password)
   SCREEN_WIFI_CONNECTING,    // new: connecting/failed status while joining a network
   SCREEN_DIAGNOSTICS,        // raw input/sensor readout, like the selftest sketch's screen
-  SCREEN_MOTOR_TEST          // hold-to-jog motor bench test
+  SCREEN_MOTOR_TEST,         // hold-to-jog motor bench test
+  SCREEN_PING_PONG           // bounce forever between the endstops, BTN1 start/stop
 };
 
 // ── Config (persisted in NVS, namespace "slider") ──
@@ -123,6 +139,12 @@ struct Config {
 
   uint8_t  theme;           // UiTheme: Dark/Light/High Contrast
   uint8_t  brightness;      // backlight, 10-100%
+
+  bool     speakerEnabled;  // buzzer clicks (encoder rotation, future event tones)
+
+  // Ping-Pong mode's reference point -- deliberately separate from savedHome/BLE G-Z (which
+  // is an arbitrary saved position); this is just which end the bounce cycle starts from.
+  uint8_t  pingPongStart;   // 0=Center, 1=Endstop1, 2=Endstop2
 };
 
 extern Config cfg;
@@ -146,6 +168,7 @@ extern BLECharacteristic* pSpeedChar;
 extern BLECharacteristic* pPositionChar;
 extern BLECharacteristic* pCurrentChar;
 extern BLECharacteristic* pConfigChar;
+extern BLECharacteristic* pProgramChar;
 
 extern volatile bool bleConnected;
 extern volatile bool bleWasConnected;
@@ -157,10 +180,17 @@ extern volatile bool     cmdStop;
 extern volatile bool     cmdHome;
 extern volatile bool     cmdGoToPos;
 extern volatile int32_t  cmdTargetPos;
+extern volatile bool     cmdPingPongStart;  // set from menu.cpp's BTN1 handler, same pattern as cmdForward etc.
 extern volatile bool     cmdSpeedChanged;
 extern volatile uint16_t cmdNewSpeed;
 extern volatile bool     cmdCurrentChanged;
 extern volatile uint16_t cmdNewCurrent;
+extern volatile bool     cmdProgramPending;
+extern volatile uint8_t  cmdProgramId;
+extern volatile uint8_t  cmdProgramAction;
+extern volatile uint8_t  cmdProgramSpeed;
+extern volatile uint8_t  cmdProgramStartPoint;
+extern volatile uint8_t  cmdProgramFlags;
 
 // ── Motor (volatile — shared with ISR) ──
 extern volatile int32_t  currentPosition;
@@ -180,6 +210,8 @@ extern hw_timer_t* stepTimer;
 extern SliderState sliderState;
 extern ErrorCode   errorCode;
 extern HomingPhase homingPhase;
+extern bool        pingPongApproaching;  // true = heading to cfg.pingPongStart, false = actively bouncing
+extern uint8_t     selectedProgram;      // SliderProgram; defaults to Ping-Pong
 
 // ── Calibration ──
 extern int32_t travelDistance;
@@ -203,6 +235,7 @@ extern bool    btn2LongPress;     // edge: BTN2 held >=800ms
 // ── Power (INA226) ──
 extern float busVoltage_V;
 extern float current_mA;
+extern bool  isCharging;   // busVoltage_V above what the battery alone can reach -- see power.cpp
 
 // ── ADXL345 ──
 extern float  adxlX, adxlY, adxlZ;
@@ -225,6 +258,7 @@ extern int32_t         editStep;
 extern void (*editCallback)(int32_t);
 extern MenuScreen      editReturnScreen;
 extern const char* const* editValueNames;  // optional text labels for values
+extern const char*    editUnit;  // optional short suffix drawn after a numeric value ("mA", "%")
 
 // Text editor state (character-wheel entry, SCREEN_TEXT_EDIT -- STA/AP password entry)
 extern char       editText[33];

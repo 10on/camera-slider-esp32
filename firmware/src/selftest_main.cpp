@@ -25,8 +25,8 @@ uint8_t backlightBrightness = 200; // 0-255, adjusted live via BTN1 (dimmer) / B
 // ── Extra buttons + endstops, input-only pins, external 10k pull-up to 3V3 required ──
 #define BTN1      35
 #define BTN2      34
-#define ENDSTOP_1 36
-#define ENDSTOP_2 39
+#define ENDSTOP_1 39
+#define ENDSTOP_2 36
 
 // ── LEDs, direct GPIO drive through series resistor ──
 #define LED_STATUS  14
@@ -254,8 +254,8 @@ void setup() {
   pinMode(ENC_SW,  INPUT_PULLUP);
   pinMode(BTN1,      INPUT);   // external pull-up required (GPIO35 has none)
   pinMode(BTN2,      INPUT);   // external pull-up required (GPIO34 has none)
-  pinMode(ENDSTOP_1, INPUT);   // external pull-up required (GPIO36 has none)
-  pinMode(ENDSTOP_2, INPUT);   // external pull-up required (GPIO39 has none)
+  pinMode(ENDSTOP_1, INPUT);   // external pull-up required (GPIO39 has none)
+  pinMode(ENDSTOP_2, INPUT);   // external pull-up required (GPIO36 has none)
   pinMode(LED_STATUS,  OUTPUT);
   pinMode(LED_BATTERY, OUTPUT);
   Serial.println("BOOT: pinMode done");
@@ -358,10 +358,10 @@ void setup() {
   Serial.printf("BOOT: adxlInit done, adxlFound=%d (addr=0x%02X)\n", adxlFound, adxlAddr);
   ina226Found = ina226.begin();
   if (ina226Found) {
-    // Shunt is now three resistors in parallel: original R100 (0.1ohm) + two added R110
-    // (0.11ohm each): 1/R = 1/0.1 + 1/0.11 + 1/0.11 -> R = ~0.0355ohm -> ceiling
-    // 81.92mV/0.0355 = ~2.31A. Requesting 2.2A for a bit of safety margin under that hard cap.
-    int rtn = ina226.setMaxCurrentShunt(2.2, 0.0355);
+    // Shunt is two 0.1ohm (R100) resistors in parallel: 1/R = 1/0.1 + 1/0.1 -> R = 0.05ohm
+    // -> ceiling 81.92mV/0.05 = ~1.64A. Requesting 1.5A for a bit of safety margin under
+    // that hard cap.
+    int rtn = ina226.setMaxCurrentShunt(1.5, 0.05);
     Serial.printf("BOOT: ina226 setMaxCurrentShunt rtn=%d (0=OK)\n", rtn);
   }
   Serial.printf("BOOT: ina226.begin done, ina226Found=%d\n", ina226Found);

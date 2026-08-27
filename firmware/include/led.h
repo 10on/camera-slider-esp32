@@ -3,5 +3,6 @@
 
 #include "globals.h"
 
+void ledInit();
 void ledSetPattern(LedPattern pat);
 void ledUpdate();

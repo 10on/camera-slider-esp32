@@ -11,6 +11,7 @@
 #include "input.h"
 #include "pins.h"
 #include "globals.h"
+#include "buzzer.h"
 
 // ── Encoder quadrature (ISR) ──
 // The ISR counts every quadrature transition, so a standard EC11 detent (one physical
@@ -112,8 +113,8 @@ void inputInit() {
   pinMode(ENC_SW,  INPUT_PULLUP);
   pinMode(BTN1,      INPUT);   // external pull-up required (GPIO35 has none)
   pinMode(BTN2,      INPUT);   // external pull-up required (GPIO34 has none)
-  pinMode(ENDSTOP_1, INPUT);   // external pull-up required (GPIO36 has none)
-  pinMode(ENDSTOP_2, INPUT);   // external pull-up required (GPIO39 has none)
+  pinMode(ENDSTOP_1, INPUT);   // external pull-up required (GPIO39 has none)
+  pinMode(ENDSTOP_2, INPUT);   // external pull-up required (GPIO36 has none)
 
   lastEncoded = (digitalRead(ENC_CLK) << 1) | digitalRead(ENC_DT);
   attachInterrupt(digitalPinToInterrupt(ENC_CLK), encoderISR, CHANGE);
@@ -134,6 +135,7 @@ void inputPoll() {
     encoderDelta += detents;
     lastReadEncoderCount += detents * COUNTS_PER_DETENT;
     lastActivityTime = millis();
+    buzzerClick();
   }
 
   // Encoder button + BTN1: short-press only.

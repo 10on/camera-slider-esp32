@@ -57,15 +57,15 @@ void adxlReadAxes() {
 // Reads ADXL for `durationMs`, returns true if the rail axis drifted beyond threshold.
 // Sets adxlMotionDir to +1 (drifting toward E2 / increasing position) or -1 (toward E1).
 //
-// AXIS: Z, not X. The old firmware watched X, but that was for the accelerometer's
-// orientation on the old hardware -- measured on this enclosure, X is the across-rail
-// (roll) axis and Z is the along-rail axis, so watching X here meant the drift detector
-// was blind to the carriage actually sliding and would only trip if the whole rig was
-// tipped sideways. Confirmed on the bench: tilting along the rail moved Z by ~0.52g while
-// X stayed flat (~0.02g); tilting sideways moved X by ~0.58g while Z stayed flat (~0.01g).
-// Sign: drifting toward E1 (position 0) reads Z negative, toward E2 positive -- which
-// matches motorStartRamp(forward=true) meaning "toward increasing position", so the
-// existing (delta > 0) ? +1 : -1 mapping is correct as-is.
+// AXIS: Y, not Z. The board was physically remounted/rotated in the enclosure after the
+// original bring-up (which measured Z as the along-rail axis, see git history) -- retested
+// by hand-tilting in the new mounting orientation, and Y is now the one that responds to
+// tilting along the rail, not Z.
+//
+// Sign is unconfirmed on the new mounting (kept the old Z convention as a best guess: (delta
+// > 0) -> +1 -> toward E2/increasing position). If the parking direction after a detected
+// drift ever drives toward the wrong endstop, flip this to `(dy > 0) ? -1 : 1` -- that is
+// the one line to change, no other logic depends on the sign.
 bool adxlCheckDrift(uint16_t durationMs) {
   if (!adxlFound || cfg.adxlSensitivity == 0) return false;
 
@@ -73,16 +73,16 @@ bool adxlCheckDrift(uint16_t durationMs) {
   float threshold = thresholds[cfg.adxlSensitivity];
 
   adxlReadAxes();
-  float baseZ = adxlZ;
+  float baseY = adxlY;
 
   unsigned long start = millis();
   while (millis() - start < durationMs) {
     delay(50);
     adxlReadAxes();
 
-    float dz = adxlZ - baseZ;
-    if (fabsf(dz) > threshold) {
-      adxlMotionDir = (dz > 0) ? 1 : -1;
+    float dy = adxlY - baseY;
+    if (fabsf(dy) > threshold) {
+      adxlMotionDir = (dy > 0) ? 1 : -1;
       return true;
     }
   }

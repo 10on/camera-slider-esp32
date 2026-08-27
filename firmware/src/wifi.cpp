@@ -18,6 +18,8 @@
 #include "pins.h"
 #include "motor.h"
 #include "display.h"
+#include "ble.h"
+#include "buzzer.h"
 
 static const char* OTA_HOSTNAME = "camera-slider";
 static bool otaStarted = false;
@@ -36,9 +38,26 @@ static void apSsid(char* buf, size_t n) {
 }
 
 void wifiApply() {
+  // WiFi and BLE share one radio. Keeping WiFi.setSleep(true) up used to be enough to dodge
+  // ESP-IDF's hard-abort ("Should enable WiFi modem sleep when both WiFi and Bluetooth are
+  // enabled") at the moment WiFi came up, but running both radios together for a while still
+  // hangs the device later (a deeper coexistence issue than the one setSleep() covers).
+  // WiFi is only ever needed for occasional OTA pushes / BLE-free control, so it's simplest
+  // and most robust to just not run both at once: BLE goes down for as long as WiFi is on,
+  // and comes back the moment WiFi is turned off (if the user still wants it).
+  if (cfg.wifiMode == WIFI_CFG_OFF) {
+    if (cfg.bleEnabled) bleInit();
+  } else {
+    bleShutdown();
+  }
+
   switch (cfg.wifiMode) {
     case WIFI_CFG_OFF:
-      WiFi.disconnect(true);
+      // wifioff=true, eraseap=true: also wipes whatever STA config esp_wifi has cached,
+      // so a stale "last connected AP" from before WiFi.persistent(false) (see wifiInit())
+      // can't survive as an auto-reconnect target across a later "Off" selection.
+      WiFi.setAutoReconnect(false);
+      WiFi.disconnect(true, true);
       WiFi.mode(WIFI_OFF);
       break;
     case WIFI_CFG_STA:
@@ -55,18 +74,22 @@ void wifiApply() {
     }
   }
 
-  // WiFi and BLE share one radio, and ESP-IDF hard-aborts ("Should enable WiFi modem sleep
-  // when both WiFi and Bluetooth are enabled") if the two are up with modem sleep off --
-  // which is a boot loop, not a warning. AP mode in particular turns power save off on its
-  // own, so this has to be re-asserted after every mode change rather than set once.
-  if (cfg.wifiMode != WIFI_CFG_OFF && cfg.bleEnabled) {
-    WiFi.setSleep(true);
-  }
-
   otaStarted = false;
 }
 
 void wifiInit() {
+  // Arduino-ESP32 defaults to persistent WiFi storage: esp_wifi keeps its own copy of the
+  // last mode/SSID/password in flash (separate from our own "slider" NVS namespace) and
+  // can carry it across a reboot regardless of what cfg.wifiMode says. Since we already
+  // persist wifiMode/staSsid/staPass ourselves and re-apply them explicitly every boot,
+  // that second copy only causes drift -- turn it off so cfg is the only source of truth.
+  WiFi.persistent(false);
+
+  // Policy: WiFi always starts OFF, regardless of whatever mode was last selected/saved.
+  // staSsid/staPass are left untouched, so "Connect to Network" -> same SSID still
+  // prefills the saved password -- this only forces a fresh opt-in every boot, it doesn't
+  // forget anything.
+  cfg.wifiMode = WIFI_CFG_OFF;
   wifiApply();
 }
 
@@ -123,12 +146,14 @@ void wifiLoop() {
       digitalWrite(MOTOR_EN, HIGH);
       sliderState = STATE_IDLE;
       displayOtaBegin();
+      buzzerOtaStartChime();
     });
     ArduinoOTA.onProgress([](unsigned int progress, unsigned int total) {
       displayOtaProgress(total ? (progress * 100U) / total : 0U);
     });
     ArduinoOTA.onEnd([]() {
       displayOtaEnd("Done - rebooting", false);
+      buzzerShutdownChime();  // ArduinoOTA calls ESP.restart() right after this callback returns
     });
     ArduinoOTA.onError([](ota_error_t err) {
       const char* m = "Update failed";

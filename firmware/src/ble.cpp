@@ -102,6 +102,29 @@ class CurrentCallbacks : public BLECharacteristicCallbacks {
   }
 };
 
+// Preset-oriented API v1 request (6 bytes):
+// [version=1, program, action, speedPercent(0=keep), startPoint(0xFF=keep), flags]
+// flags bit0 asks the slider to persist supplied settings; normal live tuning leaves it
+// clear to avoid unnecessary NVS writes on every remote-control detent.
+class ProgramCallbacks : public BLECharacteristicCallbacks {
+  void onWrite(BLECharacteristic* pChar) {
+    uint8_t* data = pChar->getData();
+    size_t len = pChar->getValue().length();
+    if (len < 6 || data[0] != 1) return;
+    if (data[1] > PROGRAM_PING_PONG || data[2] > PROGRAM_CONFIGURE) return;
+    if (data[3] > 100 || (data[4] > 2 && data[4] != 0xFF)) return;
+
+    // Publish the flag last: loop() sees either the complete old request or the complete
+    // new one, never a half-written packet from the BLE host task.
+    cmdProgramId = data[1];
+    cmdProgramAction = data[2];
+    cmdProgramSpeed = data[3];
+    cmdProgramStartPoint = data[4];
+    cmdProgramFlags = data[5];
+    cmdProgramPending = true;
+  }
+};
+
 // Tracks whether the stack is currently up, so the Wireless Settings toggle can call
 // bleInit()/bleShutdown() at runtime without double-initialising or double-freeing.
 static bool bleStarted = false;
@@ -152,6 +175,15 @@ void bleInit() {
   );
   pConfigChar->addDescriptor(new BLE2902());
 
+  pProgramChar = pService->createCharacteristic(
+    PROGRAM_UUID,
+    BLECharacteristic::PROPERTY_READ |
+    BLECharacteristic::PROPERTY_WRITE |
+    BLECharacteristic::PROPERTY_NOTIFY
+  );
+  pProgramChar->setCallbacks(new ProgramCallbacks());
+  pProgramChar->addDescriptor(new BLE2902());
+
   pService->start();
 
   BLEAdvertising* pAdvertising = BLEDevice::getAdvertising();
@@ -179,6 +211,7 @@ void bleShutdown() {
   pPositionChar = NULL;
   pCurrentChar = NULL;
   pConfigChar = NULL;
+  pProgramChar = NULL;
 }
 
 void bleStatusNotify() {
@@ -227,5 +260,23 @@ void bleStatusNotify() {
   if (pConfigChar) {
     pConfigChar->setValue(cfgbuf, sizeof(cfgbuf));
     pConfigChar->notify();
+  }
+
+  // Preset status v1 (8 bytes): version, selected program, run state, speed, start point,
+  // capability flags, slider state, error.  It is independent of the advanced motor
+  // Status characteristic and can grow by appending fields in later versions.
+  if (pProgramChar) {
+    uint8_t program[8];
+    program[0] = 1;
+    program[1] = selectedProgram;
+    program[2] = sliderState == STATE_PING_PONG ? 1 : 0;
+    program[3] = constrain(cfg.speed, (uint16_t)1, (uint16_t)100);
+    program[4] = constrain(cfg.pingPongStart, (uint8_t)0, (uint8_t)2);
+    program[5] = 0x01;  // bit0: Ping-Pong supported
+    if (isCalibrated) program[5] |= 0x02;
+    program[6] = (uint8_t)sliderState;
+    program[7] = (uint8_t)errorCode;
+    pProgramChar->setValue(program, sizeof(program));
+    pProgramChar->notify();
   }
 }

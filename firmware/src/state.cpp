@@ -9,6 +9,39 @@
 #include "config.h"
 #include "power.h"
 
+static bool directionBlockedByEndstop(bool forward) {
+  return forward ? endstop2 : endstop1;
+}
+
+static bool motorIsDrivingIntoEndstop() {
+  if (!motorRunning) return false;
+  bool forward = !motorDirection;
+  return directionBlockedByEndstop(forward);
+}
+
+static void startManualMove(bool forward) {
+  // F/B are set-direction commands.  Repeating the current direction is idempotent;
+  // requesting the opposite direction performs a controlled immediate direction change.
+  // This makes a remote's left/right controls deterministic instead of silently ignoring
+  // the second command while STATE_MANUAL_MOVING is active.
+  if (sliderState == STATE_MANUAL_MOVING && motorRunning) {
+    if ((!motorDirection) == forward) return;
+    motorStopNow();
+  }
+
+  if (directionBlockedByEndstop(forward)) {
+    sliderState = STATE_IDLE;
+    displayDirty = true;
+    return;
+  }
+
+  sliderState = STATE_MANUAL_MOVING;
+  digitalWrite(MOTOR_EN, LOW);
+  driver.rms_current(cfg.motorCurrent);
+  motorStartRamp(forward, speedToInterval(cfg.speed));
+  displayDirty = true;
+}
+
 void stateUpdate() {
   processBleCommands();
 
@@ -17,7 +50,8 @@ void stateUpdate() {
     bleWasConnected = false;
     if (sliderState == STATE_MANUAL_MOVING ||
         sliderState == STATE_MOVING_TO_POS ||
-        sliderState == STATE_HOMING) {
+        sliderState == STATE_HOMING ||
+        sliderState == STATE_PING_PONG) {
       motorStopNow();
       sliderState = STATE_ERROR;
       errorCode = ERR_BLE_LOST;
@@ -27,12 +61,27 @@ void stateUpdate() {
   }
   if (bleConnected) bleWasConnected = true;
 
-  if (endstop1Rising || endstop2Rising) {
+  // Check the debounced level, not only the one-loop rising-edge flag.  That closes the
+  // hole where a command or mode transition could begin after the edge had already been
+  // consumed while the carriage was still holding the switch.
+  if (motorIsDrivingIntoEndstop()) {
     handleEndstopHit();
   }
 
   if (sliderState == STATE_MOVING_TO_POS && !motorRunning) {
     sliderState = STATE_IDLE;
+    displayDirty = true;
+  }
+
+  // Ping-Pong's first leg (heading to cfg.pingPongStart) uses motorMoveTo(), which stops the
+  // motor itself once the target step count is reached -- no endstop involved when the start
+  // is Center. Once arrived, kick off the actual bounce cycle. (If the start is an endstop
+  // instead, handleEndstopHit() below gets there first and this never fires -- motorRunning
+  // is already true again by the time we reach this check.)
+  if (sliderState == STATE_PING_PONG && pingPongApproaching && !motorRunning) {
+    pingPongApproaching = false;
+    bool goForward = (cfg.pingPongStart != 2);  // start=End2 -> first leg is backward
+    motorStartRamp(goForward, speedToInterval(cfg.speed));
     displayDirty = true;
   }
 
@@ -49,6 +98,29 @@ void stateUpdate() {
 }
 
 void processBleCommands() {
+  // High-level preset request. Selection/configuration is orthogonal to execution: a
+  // remote can tune Ping-Pong while it is stopped or running, then issue START/STOP.
+  if (cmdProgramPending) {
+    uint8_t program = cmdProgramId;
+    uint8_t action = cmdProgramAction;
+    uint8_t speed = cmdProgramSpeed;
+    uint8_t startPoint = cmdProgramStartPoint;
+    uint8_t flags = cmdProgramFlags;
+    cmdProgramPending = false;
+
+    selectedProgram = program;
+    if (speed >= 1 && speed <= 100) {
+      cfg.speed = speed;
+      targetInterval = speedToInterval(cfg.speed);
+      if (motorRunning) rampStepsLeft = 50;
+    }
+    if (startPoint <= 2) cfg.pingPongStart = startPoint;
+    if (flags & 0x01) configSave();
+    if (action == PROGRAM_STOP) cmdStop = true;
+    if (action == PROGRAM_START && program == PROGRAM_PING_PONG) cmdPingPongStart = true;
+    displayDirty = true;
+  }
+
   // Speed change (always accepted, BLE sends 1-100)
   if (cmdSpeedChanged) {
     cmdSpeedChanged = false;
@@ -98,12 +170,8 @@ void processBleCommands() {
   // Forward command -- block if endstop2 (forward end) is triggered
   if (cmdForward) {
     cmdForward = false;
-    if (sliderState == STATE_IDLE && !endstop2) {
-      sliderState = STATE_MANUAL_MOVING;
-      digitalWrite(MOTOR_EN, LOW);
-      driver.rms_current(cfg.motorCurrent);
-      motorStartRamp(true, speedToInterval(cfg.speed));
-      displayDirty = true;
+    if (sliderState == STATE_IDLE || sliderState == STATE_MANUAL_MOVING) {
+      startManualMove(true);
     }
     return;
   }
@@ -111,12 +179,8 @@ void processBleCommands() {
   // Backward command -- block if endstop1 (backward end) is triggered
   if (cmdBackward) {
     cmdBackward = false;
-    if (sliderState == STATE_IDLE && !endstop1) {
-      sliderState = STATE_MANUAL_MOVING;
-      digitalWrite(MOTOR_EN, LOW);
-      driver.rms_current(cfg.motorCurrent);
-      motorStartRamp(false, speedToInterval(cfg.speed));
-      displayDirty = true;
+    if (sliderState == STATE_IDLE || sliderState == STATE_MANUAL_MOVING) {
+      startManualMove(false);
     }
     return;
   }
@@ -138,6 +202,24 @@ void processBleCommands() {
     }
     return;
   }
+
+  // Start Ping-Pong -- head to cfg.pingPongStart first; stateUpdate() picks up the arrival
+  // and kicks off the actual bounce cycle (see the pingPongApproaching check above).
+  if (cmdPingPongStart) {
+    cmdPingPongStart = false;
+    if (sliderState == STATE_IDLE && isCalibrated) {
+      int32_t target = (cfg.pingPongStart == 1) ? 0
+                      : (cfg.pingPongStart == 2) ? travelDistance
+                      : centerPosition;
+      sliderState = STATE_PING_PONG;
+      pingPongApproaching = true;
+      digitalWrite(MOTOR_EN, LOW);
+      driver.rms_current(cfg.motorCurrent);
+      motorMoveTo(target, speedToInterval(cfg.speed));
+      displayDirty = true;
+    }
+    return;
+  }
 }
 
 void handleEndstopHit() {
@@ -147,6 +229,19 @@ void handleEndstopHit() {
   // During parking -- stop at endstop
   if (sliderState == STATE_PARKING) {
     motorStopNow();
+    return;
+  }
+
+  // Ping-Pong: always reverse and keep going, regardless of cfg.endstopMode -- this is a
+  // dedicated mode, not the general Endstop Mode setting. Also covers the case where
+  // cfg.pingPongStart is an endstop itself: hitting it while still "approaching" is treated
+  // the same as arriving, then immediately bounces off in the other direction.
+  if (sliderState == STATE_PING_PONG) {
+    motorStopNow();
+    pingPongApproaching = false;
+    bool newForward = motorDirection;  // motorDirection is inverted (true=backward)
+    motorStartRamp(newForward, speedToInterval(cfg.speed));
+    displayDirty = true;
     return;
   }
 
@@ -203,6 +298,7 @@ const char* stateToString(SliderState s) {
     case STATE_PARKING:       return "PARKING";
     case STATE_ERROR:         return "ERROR";
     case STATE_SLEEP:         return "SLEEP";
+    case STATE_PING_PONG:     return "PING PONG";
     default:                  return "?";
   }
 }

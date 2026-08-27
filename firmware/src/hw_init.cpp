@@ -6,8 +6,8 @@
 #include "globals.h"
 
 void hwInit() {
-  pinMode(LED_STATUS,  OUTPUT);
-  pinMode(LED_BATTERY, OUTPUT);
+  // LED_STATUS/LED_BATTERY are ledc-driven (see led.cpp's ledInit(), for the WiFi-active
+  // smooth crossfade) -- no pinMode() here, ledcAttachPin() configures the pin itself.
 
   Wire.begin(I2C_SDA, I2C_SCL);
 

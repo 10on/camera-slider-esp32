@@ -25,10 +25,10 @@ void powerInit() {
     // the hard way with the original bare 0.1ohm shunt (R100 alone -> ~0.82A hard ceiling,
     // too tight for this board's total draw of motor + ESP32 + display + backlight).
     //
-    // Hardware fix applied: two 0.11ohm (R110) resistors soldered in parallel on top of the
-    // original R100. Three-way parallel: 1/R = 1/0.1 + 1/0.11 + 1/0.11 -> R = ~0.0355ohm ->
-    // ceiling 81.92mV/0.0355 = ~2.31A. Requesting 2.2A for a bit of margin under that cap.
-    ina226.setMaxCurrentShunt(2.2, 0.0355);
+    // Current hardware: two 0.1ohm (R100) resistors in parallel (the earlier 2xR110 fix
+    // was replaced, not stacked on top). 1/R = 1/0.1 + 1/0.1 -> R = 0.05ohm -> ceiling
+    // 81.92mV/0.05 = ~1.64A. Requesting 1.5A for a bit of margin under that cap.
+    ina226.setMaxCurrentShunt(1.5, 0.05);
   }
 }
 
@@ -36,6 +36,7 @@ void powerRead() {
   if (!ina226Found) return;
   busVoltage_V = ina226.getBusVoltage();
   current_mA   = ina226.getCurrent_mA();
+  isCharging   = busVoltage_V > VBAT_CHARGING_THRESHOLD;
 }
 
 int batteryPercent() {
